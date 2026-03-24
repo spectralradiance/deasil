@@ -73,9 +73,9 @@ const Page = () => {
   };
 
   return (
-    <Box sx={{ padding: '2rem' }}>
+    <Box sx={{ maxWidth: 1200, margin: '0 auto', padding: '2rem' }}>
       <Typography variant="h4" component="h1" gutterBottom>
-        Vara - Rune and Ogham Translator
+        Glyph
       </Typography>
       <TextField
         value={text}
