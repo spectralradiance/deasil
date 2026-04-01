@@ -6,6 +6,7 @@ import { client } from '../../sanity-client';
 import imageUrlBuilder from '@sanity/image-url';
 import { PortableText } from '@portabletext/react';
 import Link from "next/link";
+import TableOfContents from './TableOfContents';
 
 const builder = imageUrlBuilder(client);
 
@@ -71,70 +72,84 @@ export default function ArticleDetailPage() {
     fetchPost();
   }, [slug]);
 
+  const slugify = (text: string) => {
+    return text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+  };
+
+  const components = {
+    block: {
+      h2: ({children}: any) => {
+        const text = children.map((child: any) => typeof child === 'string' ? child : child.props.children).join('');
+        const id = slugify(text);
+        return <Typography variant="h2" id={id} sx={{ mt: 4, mb: 2 }}>{children}</Typography>;
+      },
+      h3: ({children}: any) => {
+        const text = children.map((child: any) => typeof child === 'string' ? child : child.props.children).join('');
+        const id = slugify(text);
+        return <Typography variant="h3" id={id} sx={{ mt: 3, mb: 1 }}>{children}</Typography>;
+      },
+      h4: ({children}: any) => {
+        const text = children.map((child: any) => typeof child === 'string' ? child : child.props.children).join('');
+        const id = slugify(text);
+        return <Typography variant="h4" id={id} sx={{ mt: 2, mb: 1 }}>{children}</Typography>;
+      },
+    },
+  };
+
   if (!article) return <Box sx={{ p: 4 }}>Article not found.</Box>;
 
   return (
-    <Box sx={{ maxWidth: 700, mx: "auto", my: 4, px: 2 }}>
-      <Typography gutterBottom variant="h2" component="div">
-        {article.title}
-      </Typography>
-      {article.description && (
-        <Typography variant="h5" color="text.secondary" sx={{ mb: 2 }}>
-          {article.description}
+    <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', p: 4 }}>
+      {article.body && <TableOfContents body={article.body} />}
+      <Box sx={{ flexGrow: 1, maxWidth: 700, mx: "auto", px: 2 }}>
+        <Typography gutterBottom variant="h2" component="div">
+          {article.title}
         </Typography>
-      )}
-      <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-        {article.author && article.author.slug && (
-          <Link href={`/writing/author/${article.author.slug.current}`} passHref>
-            <Typography component="a" variant="body2" sx={{ mr: 1, textDecoration: 'none', color: 'inherit' }}>
-              By {article.author.name}
-            </Typography>
-          </Link>
-        )}
-        {article.publishedAt && (
-          <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
-            | {new Date(article.publishedAt).toLocaleDateString()}
+        {article.description && (
+          <Typography variant="h5" color="text.secondary" sx={{ mb: 2 }}>
+            {article.description}
           </Typography>
         )}
-        {article.categories && (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+          {article.author && article.author.slug && (
+            <Link href={`/writing/author/${article.author.slug.current}`} passHref>
+              <Typography component="a" variant="body2" sx={{ mr: 1, textDecoration: 'none', color: 'inherit' }}>
+                By {article.author.name}
+              </Typography>
+            </Link>
+          )}
+          {article.publishedAt && (
             <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
-              |
+              | {new Date(article.publishedAt).toLocaleDateString()}
             </Typography>
-            {article.categories.map((cat, index) => (
-              cat.slug && <Link href={`/writing/category/${cat.slug.current}`} passHref key={cat.slug.current}>
-                <Typography component="a" variant="body2" color="text.secondary" sx={{ textDecoration: 'none', color: 'inherit' }}>
-                  {cat.title}
-                  {index < article.categories.length - 1 && ", "}
-                </Typography>
-              </Link>
-            ))}
-          </Box>
+          )}
+          {article.categories && (
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+                |
+              </Typography>
+              {article.categories.map((cat, index) => (
+                cat.slug && <Link href={`/writing/category/${cat.slug.current}`} passHref key={cat.slug.current}>
+                  <Typography component="a" variant="body2" color="text.secondary" sx={{ textDecoration: 'none', color: 'inherit' }}>
+                    {cat.title}
+                    {index < article.categories.length - 1 && ", "}
+                  </Typography>
+                </Link>
+              ))}
+            </Box>
+          )}
+        </Box>
+        {article.mainImage && (
+          <Card sx={{ mb: 2 }}>
+            <CardMedia
+              component="img"
+              height="300"
+              image={urlFor(article.mainImage).width(1400).url()}
+              alt={article.title}
+            />
+          </Card>
         )}
-      </Box>
-      {article.mainImage && (
-        <Box
-          component="img"
-          src={urlFor(article.mainImage).url()}
-          alt={article.title}
-          sx={{
-            width: "100%",
-            height: "auto",
-            maxHeight: "400px",
-            objectFit: "cover",
-            my: 3,
-          }}
-        />
-      )}
-      <Box
-        sx={{
-          "& p": {
-            fontSize: "1.1rem",
-            lineHeight: "1.7",
-          },
-        }}
-      >
-        <PortableText value={article.body} />
+        {article.body && <PortableText value={article.body} components={components} />}
       </Box>
     </Box>
   );

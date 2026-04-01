@@ -92,6 +92,7 @@ export default function AppBar() {
                   <Button color="inherit" component={Link} href="/writing">writing</Button>
                   <Button color="inherit" component={Link} href="/photos">photos</Button>
                   <Button color="inherit" component={Link} href="/programs">programs</Button>
+                  <Button color="inherit" component={Link} href="/about">about</Button>
                 </>
               )}
               <IconButton

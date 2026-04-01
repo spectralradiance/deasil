@@ -117,7 +117,7 @@ export default function SundialPage() {
       }}
     >
       <Box>
-        <Typography variant="h1" component="div" sx={{ fontFamily: 'monospace', mb: 2 }}>
+        <Typography variant="h1" component="div" sx={{ fontFamily: 'monospace', mb: 2, letterSpacing: '0.1em' }}>
           {`${hours}:${minutes}:${seconds}.${milliseconds}`}
         </Typography>
         <Typography variant="h4" component="div" sx={{ fontFamily: 'monospace' }}>
