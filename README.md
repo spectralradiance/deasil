@@ -8,6 +8,15 @@ the front-end of deasil.org
 
 ## Programs
 
+
+
+show hamburger menu on each page, expand to show icons
+- share - social media icons, email icon, link icon (copy link)
+- light/dark mode
+- table of contents
+
+
+
 ### Sundial
 
 

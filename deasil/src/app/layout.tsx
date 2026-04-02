@@ -1,7 +1,7 @@
 "use client";
 
 import type { Metadata } from "next";
-import { Baloo_2 } from "next/font/google";
+import { Baloo_2, Comfortaa } from "next/font/google";
 import "./globals.css";
 import React from "react";
 import { ThemeProvider, useTheme } from "@mui/material/styles";
@@ -14,6 +14,13 @@ const baloo2 = Baloo_2({
   weight: ['400'],
   subsets: ['latin'],
   display: 'swap',
+});
+
+const comfortaa = Comfortaa({
+  weight: ['300', '400', '700'],
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-comfortaa',
 });
 
 // export const metadata: Metadata = {
@@ -73,7 +80,7 @@ export default function RootLayout({
         <link rel="manifest" href="/favicons/site.webmanifest" />
         <link rel="icon" href="/favicons/favicon.ico" />
       </head>
-      <body suppressHydrationWarning>
+      <body className={comfortaa.variable} suppressHydrationWarning>
         <ThemeModeContext.Provider value={{ mode, setMode }}>
           <ThemeProvider theme={mode === 'dark' ? darkTheme : lightTheme}>
             <CssBaseline />

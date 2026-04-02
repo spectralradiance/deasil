@@ -133,6 +133,9 @@ const Page = () => {
                 <Typography variant="h4">{selectedSymbol.glyph}</Typography>
                 <Typography variant="h5">{selectedSymbol.name}</Typography>
                 <Typography variant="body1"><strong>Meaning:</strong> {selectedSymbol.meaning}</Typography>
+                {'aett' in selectedSymbol && (
+                  <Typography variant="body1"><strong>Aett:</strong> {selectedSymbol.aett}</Typography>
+                )}
                 {'poem' in selectedSymbol && selectedSymbol.poem.original && (
                   <Box sx={{ marginTop: '1rem' }}>
                     <Typography variant="h6">Rune Poem</Typography>

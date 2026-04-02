@@ -2,6 +2,7 @@ export interface Rune {
   name: string;
   glyph: string;
   meaning: string;
+  aett: string;
   poem: {
     original: string;
     translation: string;
@@ -26,6 +27,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Fehu',
     glyph: 'ᚠ',
     meaning: 'Wealth, cattle',
+    aett: "Freyr's Aett",
     poem: {
       original: 'Fé er frænda róg ok flæðar viti ok grafseiðs gata',
       translation: 'Wealth is a source of discord among kinsmen and fire of the sea and path of the serpent.'
@@ -35,6 +37,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Uruz',
     glyph: 'ᚢ',
     meaning: 'Aurochs, strength',
+    aett: "Freyr's Aett",
     poem: {
       original: 'Úr er skýja grátr ok skára þverrir ok hirðis hatr.',
       translation: 'Shower is lamentation of the clouds and ruin of the hay-harvest and abomination of the shepherd.'
@@ -44,6 +47,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Thurisaz',
     glyph: 'ᚦ',
     meaning: 'Giant, thorn',
+    aett: "Freyr's Aett",
     poem: {
       original: 'Þurs er kvenna kvöl ok kletta búi ok varðrúnar verr.',
       translation: 'Giant is torture of women and cliff-dweller and husband of a giantess.'
@@ -53,6 +57,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Ansuz',
     glyph: 'ᚨ',
     meaning: 'God, mouth',
+    aett: "Freyr's Aett",
     poem: {
       original: 'Óss er aldingautr ok ásgarðs jöfurr, ok valhallar vísi.',
       translation: 'God is aged Gautr and prince of Ásgarðr and lord of Valhalla.'
@@ -62,6 +67,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Raido',
     glyph: 'ᚱ',
     meaning: 'Riding, journey',
+    aett: "Freyr's Aett",
     poem: {
       original: 'Reið er sitjandi sæla ok snúðig ferð ok jórs erfiði.',
       translation: 'Riding is joy of the horsemen and speedy journey and toil of the steed.'
@@ -71,6 +77,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Kenaz',
     glyph: 'ᚲ',
     meaning: 'Torch',
+    aett: "Freyr's Aett",
     poem: {
       original: 'Kaun er barna böl ok bardaga [för] ok holdfúa hús.',
       translation: 'Ulcer is disease fatal to children and painful spot and abode of mortification.'
@@ -80,6 +87,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Gebo',
     glyph: 'ᚷ',
     meaning: 'Gift',
+    aett: "Freyr's Aett",
     poem: {
       original: '', // No Icelandic rune poem for Gebo
       translation: ''
@@ -89,6 +97,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Wunjo',
     glyph: 'ᚹ',
     meaning: 'Joy',
+    aett: "Freyr's Aett",
     poem: {
       original: '', // No Icelandic rune poem for Wunjo
       translation: ''
@@ -98,6 +107,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Hagalaz',
     glyph: 'ᚺ',
     meaning: 'Hail',
+    aett: "Heimdall's Aett",
     poem: {
       original: 'Hagall er kaldakorn ok krapadrífa ok snáka sótt.',
       translation: 'Hail is cold grain and shower of sleet and sickness of serpents.'
@@ -107,6 +117,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Naudiz',
     glyph: 'ᚾ',
     meaning: 'Need, necessity',
+    aett: "Heimdall's Aett",
     poem: {
       original: 'Nauð er Þýjar þrá ok þungr kostr ok vássamlig verk.',
       translation: 'Constraint is grief of the bond-maid and state of oppression and toilsome work.'
@@ -116,6 +127,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Isaz',
     glyph: 'ᛁ',
     meaning: 'Ice',
+    aett: "Heimdall's Aett",
     poem: {
       original: 'Íss er árbörkr ok unnar þak ok feigra manna fár.',
       translation: 'Ice is bark of rivers and roof of the wave and destruction of the doomed.'
@@ -125,6 +137,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Jera',
     glyph: 'ᛃ',
     meaning: 'Year, harvest',
+    aett: "Heimdall's Aett",
     poem: {
       original: 'Ár er gumna góði ok gott sumar algróinn akr.',
       translation: 'Plenty is boon to men and good summer and thriving crops.'
@@ -134,6 +147,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Eihwaz',
     glyph: 'ᛇ',
     meaning: 'Yew tree',
+    aett: "Heimdall's Aett",
     poem: {
       original: 'Ýr er bendr bogi ok brotgjarnt járn ok fífu fárbauti.',
       translation: 'Yew is bent bow and brittle iron and giant of the arrow.'
@@ -143,6 +157,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Perthro',
     glyph: 'ᛈ',
     meaning: 'Lot cup, fate',
+    aett: "Heimdall's Aett",
     poem: {
       original: '', // No Icelandic rune poem for Perthro
       translation: ''
@@ -152,6 +167,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Algiz',
     glyph: 'ᛉ',
     meaning: 'Elk, protection',
+    aett: "Heimdall's Aett",
     poem: {
       original: 'Ýr er bendr bogi ok brotgjarnt járn ok fífu fárbauti.',
       translation: 'Yew is bent bow and brittle iron and giant of the arrow.'
@@ -161,6 +177,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Sowilo',
     glyph: 'ᛊ',
     meaning: 'Sun',
+    aett: "Heimdall's Aett",
     poem: {
       original: 'Sól er skýja skjöldr ok skínandi röðull ok ísa aldrtregi.',
       translation: 'Sun is shield of the clouds and shining ray and destroyer of ice.'
@@ -170,6 +187,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Tiwaz',
     glyph: 'ᛏ',
     meaning: 'The god Tyr',
+    aett: "Tyr's Aett",
     poem: {
       original: 'Týr er einhendr áss ok ulfs leifar ok hofa hilmir.',
       translation: 'Týr is god with one hand and leavings of the wolf and prince of temples.'
@@ -179,6 +197,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Berkano',
     glyph: 'ᛒ',
     meaning: 'Birch',
+    aett: "Tyr's Aett",
     poem: {
       original: 'Bjarkan er laufgat lim ok lítit tré ok ungsamligr viðr.',
       translation: 'Birch is leafy twig and little tree and fresh young shrub.'
@@ -188,6 +207,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Ehwaz',
     glyph: 'ᛖ',
     meaning: 'Horse',
+    aett: "Tyr's Aett",
     poem: {
       original: '', // No Icelandic rune poem for Ehwaz
       translation: ''
@@ -197,6 +217,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Mannaz',
     glyph: 'ᛗ',
     meaning: 'Man, mankind',
+    aett: "Tyr's Aett",
     poem: {
       original: 'Maðr er manns gaman ok moldar auki ok skipa skreytir.',
       translation: 'Man is delight of man and augmentation of the earth and adorner of ships.'
@@ -206,6 +227,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Laguz',
     glyph: 'ᛚ',
     meaning: 'Water, lake',
+    aett: "Tyr's Aett",
     poem: {
       original: 'Lögr er vellanda vatn ok viðr ketill ok glömmungr grund.',
       translation: 'Water is eddying stream and broad geysir and land of the fish.'
@@ -215,6 +237,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Ingwaz',
     glyph: 'ᛜ',
     meaning: 'The god Ing',
+    aett: "Tyr's Aett",
     poem: {
       original: '', // No Icelandic rune poem for Ingwaz
       translation: ''
@@ -224,6 +247,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Dagaz',
     glyph: 'ᛞ',
     meaning: 'Day',
+    aett: "Tyr's Aett",
     poem: {
       original: '', // No Icelandic rune poem for Dagaz
       translation: ''
@@ -233,6 +257,7 @@ export const runes: { [key: string]: Rune } = {
     name: 'Othala',
     glyph: 'ᛟ',
     meaning: 'Heritage, ancestral property',
+    aett: "Tyr's Aett",
     poem: {
       original: '', // No Icelandic rune poem for Othala
       translation: ''
