@@ -49,10 +49,13 @@ export default function AppBar() {
     setDrawerOpen(open);
   };
 
+  const iconFilter = mode === 'dark' ? 'brightness(0) invert(1)' : 'brightness(0)';
+
   const menuOptions = [
-    { label: 'writing', href: '/writing' },
-    { label: 'photos', href: '/photos' },
-    { label: 'programs', href: '/programs' },
+    { label: 'writing',   icon: '/menu/writing.svg',     href: '/writing'  },
+    { label: 'photos',    icon: '/menu/photography.svg', href: '/photos'   },
+    { label: 'programs', icon: '/menu/programs.svg',     href: '/programs' },
+    { label: 'about',    icon: '/menu/about.svg',        href: '/about'    },
   ];
   const list = (
     <Box
@@ -64,8 +67,11 @@ export default function AppBar() {
       <List>
         {menuOptions.map((item) => (
           <ListItem key={item.label} disablePadding>
-            <ListItemButton component={item.href !== '#' ? Link : 'button'} href={item.href !== '#' ? item.href : undefined}>
-              <ListItemText primary={item.label} sx={{ textTransform: 'lowercase' }} />
+            <ListItemButton component={Link} href={item.href}
+              sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, py: 2 }}
+            >
+              <img src={item.icon} alt={item.label} width={32} height={32} style={{ filter: iconFilter }} />
+              <ListItemText primary={item.label} sx={{ textTransform: 'lowercase', m: 0 }} />
             </ListItemButton>
           </ListItem>
         ))}
@@ -89,10 +95,14 @@ export default function AppBar() {
                       </Typography>
               {!isMobile && (
                 <>
-                  <Button color="inherit" component={Link} href="/writing">writing</Button>
-                  <Button color="inherit" component={Link} href="/photos">photos</Button>
-                  <Button color="inherit" component={Link} href="/programs">programs</Button>
-                  <Button color="inherit" component={Link} href="/about">about</Button>
+                  {menuOptions.map((item) => (
+                    <IconButton key={item.label} component={Link} href={item.href} color="inherit"
+                      aria-label={item.label}
+                      sx={{ '&:hover': { backgroundColor: 'transparent' } }}
+                    >
+                      <img src={item.icon} alt={item.label} width={24} height={24} style={{ filter: iconFilter }} />
+                    </IconButton>
+                  ))}
                 </>
               )}
               <IconButton

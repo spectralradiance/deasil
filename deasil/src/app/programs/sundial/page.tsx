@@ -138,6 +138,19 @@ const AnalogClock = ({ date, sunrise, sunset }: { date: Date; sunrise?: Date | n
     ? new Date(solarNoon.getTime() + 12 * 3600 * 1000)
     : null;
 
+  const hexToRgb = (hex: string) => ({
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16),
+  });
+
+  const totalHours = h + m / 60 + s / 3600;
+  const handColorIndex = (Math.floor(totalHours / 6) + 2) % 4;
+  const handSegmentPercent = (totalHours % 6) / 6;
+  const hc0 = hexToRgb(ClockColors[handColorIndex]);
+  const hc1 = hexToRgb(ClockColors[(handColorIndex + 1) % 4]);
+  const handColor = `rgb(${Math.round(hc0.r + (hc1.r - hc0.r) * handSegmentPercent)}, ${Math.round(hc0.g + (hc1.g - hc0.g) * handSegmentPercent)}, ${Math.round(hc0.b + (hc1.b - hc0.b) * handSegmentPercent)})`;
+
   return (
     <svg width={size} height={size} viewBox="-20 -20 240 240">
       <defs>
@@ -184,13 +197,6 @@ const AnalogClock = ({ date, sunrise, sunset }: { date: Date; sunrise?: Date | n
         const nextColorIndex = (colorIndex + 1) % 4;
         const segmentPercent = (i % 6) / 6;
 
-        const hexToRgb = (hex: string) => {
-          const r = parseInt(hex.slice(1, 3), 16);
-          const g = parseInt(hex.slice(3, 5), 16);
-          const b = parseInt(hex.slice(5, 7), 16);
-          return { r, g, b };
-        };
-
         const startRgb = hexToRgb(ClockColors[colorIndex]);
         const endRgb = hexToRgb(ClockColors[nextColorIndex]);
 
@@ -222,9 +228,9 @@ const AnalogClock = ({ date, sunrise, sunset }: { date: Date; sunrise?: Date | n
       {/* Single 24-hour hand */}
       <line
         x1={cx} y1={cy}
-        x2={cx + R * 0.75 * Math.cos(rad)}
-        y2={cy + R * 0.75 * Math.sin(rad)}
-        stroke="currentColor" strokeWidth={3} strokeLinecap="round"
+        x2={cx + R * Math.cos(rad)}
+        y2={cy + R * Math.sin(rad)}
+        stroke={handColor} strokeWidth={3}
       />
       <circle cx={cx} cy={cy} r={3} fill="currentColor" />
       {sunrise && dayIconMarker(sunrise, cx, cy, R, '/sundial/day/sunrise.svg', ClockColors[3])}
@@ -372,10 +378,10 @@ const Sabbats = [
 
 // Seasonal colors aligned to each sabbat
 const SeasonalColors = [
-  '#8B4513', // Samhain  – deep autumn brown
-  '#1E3A8A', // Yule     – deep winter blue
-  '#60A5FA', // Imbolc   – late-winter sky blue
-  '#86EFAC', // Ostara   – spring green
+  '#B22222', // Samhain  – deep autumn red
+  '#7C3AED', // Yule     – deep winter purple
+  '#1E3A8A', // Imbolc   – late-winter sky blue
+  '#60A5FA', // Ostara   – spring green
   '#16A34A', // Beltane  – vibrant green
   '#FDE047', // Litha    – summer gold
   '#F97316', // Lughnasadh – harvest orange
@@ -397,11 +403,11 @@ const WheelOfYear = () => {
     theme.palette.mode === 'dark' ? 'brightness(0) invert(1)' : 'brightness(0)';
   const size = 400; // Total SVG width/height
   const center = size / 2;
-  const radius = 130; // Distance from center to symbols
-  const innerR = 95;
-  const outerR = 105;
-  const seasonOuterR = 88;
-  const seasonInnerR = 58;
+  const radius = 110; // Distance from center to symbols
+  const innerR = 75;
+  const outerR = 85;
+  const seasonOuterR = 50;
+  const seasonInnerR = 30;
   const n = Sabbats.length;
 
   // Calculate current day of the year
@@ -417,25 +423,32 @@ const WheelOfYear = () => {
   const samhainOffset = 61;
   const dayAngle = ((dayOfYear + samhainOffset) / 365) * 2 * Math.PI + Math.PI / 4;
 
+  // Interpolate the seasonal gradient color at dayAngle
+  const segmentAngle = (2 * Math.PI) / n;
+  const normalizedAngle = ((dayAngle - Math.PI / 4) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+  const segIdx = Math.floor(normalizedAngle / segmentAngle) % n;
+  const segPercent = (normalizedAngle % segmentAngle) / segmentAngle;
+  const hexToRgb = (hex: string) => ({
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16),
+  });
+  const sc0 = hexToRgb(SeasonalColors[segIdx]);
+  const sc1 = hexToRgb(SeasonalColors[(segIdx + 1) % n]);
+  const dayLineColor = `rgb(${Math.round(sc0.r + (sc1.r - sc0.r) * segPercent)}, ${Math.round(sc0.g + (sc1.g - sc0.g) * segPercent)}, ${Math.round(sc0.b + (sc1.b - sc0.b) * segPercent)})`;
+
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <g>
         {/* Season inner sectors */}
-        {Seasons.map(({ name, color, startIdx, endIdx }) => {
+        {/* Outer and inner arcs bounding the season ring */}
+        <circle cx={center} cy={center} r={seasonOuterR} fill="none" stroke="currentColor" strokeWidth={0.5} opacity={0.5} />
+        <circle cx={center} cy={center} r={seasonInnerR} fill="none" stroke="currentColor" strokeWidth={0.5} opacity={0.5} />
+        {Seasons.map(({ name, startIdx }) => {
           const a0 = (startIdx / n) * 2 * Math.PI + Math.PI / 4;
-          const a1 = (endIdx / n) * 2 * Math.PI + Math.PI / 4;
-          const c0 = Math.cos(a0), s0 = Math.sin(a0);
-          const c1 = Math.cos(a1), s1 = Math.sin(a1);
-          const d = [
-            `M ${center + seasonOuterR * c0} ${center + seasonOuterR * s0}`,
-            `A ${seasonOuterR} ${seasonOuterR} 0 0 1 ${center + seasonOuterR * c1} ${center + seasonOuterR * s1}`,
-            `L ${center + seasonInnerR * c1} ${center + seasonInnerR * s1}`,
-            `A ${seasonInnerR} ${seasonInnerR} 0 0 0 ${center + seasonInnerR * c0} ${center + seasonInnerR * s0}`,
-            'Z',
-          ].join(' ');
+          const a1 = (((startIdx + 2) % n) / n) * 2 * Math.PI + Math.PI / 4;
           const textR = (seasonOuterR + seasonInnerR) / 2 - 4;
           const textPathId = `season-arc-${name}`;
-          // Arc path for the text to follow, going clockwise from a0 to a1
           const textArcD = [
             `M ${center + textR * Math.cos(a0)} ${center + textR * Math.sin(a0)}`,
             `A ${textR} ${textR} 0 0 1 ${center + textR * Math.cos(a1)} ${center + textR * Math.sin(a1)}`,
@@ -445,7 +458,14 @@ const WheelOfYear = () => {
               <defs>
                 <path id={textPathId} d={textArcD} />
               </defs>
-              <path d={d} fill={color} opacity={0.8} />
+              {/* Dividing line at start of season */}
+              <line
+                x1={center + seasonInnerR * Math.cos(a0)}
+                y1={center + seasonInnerR * Math.sin(a0)}
+                x2={center + seasonOuterR * Math.cos(a0)}
+                y2={center + seasonOuterR * Math.sin(a0)}
+                stroke="currentColor" strokeWidth={1} opacity={0.5}
+              />
               <text fontSize="10" fill="currentColor">
                 <textPath href={`#${textPathId}`} startOffset="50%" textAnchor="middle">
                   {name}
@@ -457,16 +477,16 @@ const WheelOfYear = () => {
         {/* Sabbaths Ticks */}
         {Array.from({ length: n }).map((_, i) => {
           const angle = (i / n) * 2 * Math.PI + Math.PI / 4;
-          const tickLength = 10;
+          const tickLength = 5;
           return (
             <line
               key={`tick-${i}`}
-              x1={center + (outerR - tickLength) * Math.cos(angle)}
-              y1={center + (outerR - tickLength) * Math.sin(angle)}
-              x2={center + outerR * Math.cos(angle)}
-              y2={center + outerR * Math.sin(angle)}
-              stroke="currentColor"
-              strokeWidth={1.5}
+              x1={center + (innerR - tickLength) * Math.cos(angle)}
+              y1={center + (innerR - tickLength) * Math.sin(angle)}
+              x2={center + (outerR + tickLength) * Math.cos(angle)}
+              y2={center + (outerR + tickLength) * Math.sin(angle)}
+              stroke={SeasonalColors[i]}
+              strokeWidth={2}
             />
           );
         })}
@@ -542,9 +562,9 @@ const WheelOfYear = () => {
       <line
         x1={center}
         y1={center}
-        x2={center + radius * Math.cos(dayAngle)}
-        y2={center + radius * Math.sin(dayAngle)}
-        stroke="currentColor"
+        x2={center + outerR * Math.cos(dayAngle)}
+        y2={center + outerR * Math.sin(dayAngle)}
+        stroke={dayLineColor}
         strokeWidth="2"
       />
     </svg>
