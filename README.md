@@ -1,13 +1,7 @@
 # deasil
-
-
-the front-end of deasil.org
-
-
-
+> the front-end of deasil.org
 
 ## Programs
-
 
 
 show hamburger menu on each page, expand to show icons

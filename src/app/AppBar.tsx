@@ -49,13 +49,11 @@ export default function AppBar() {
     setDrawerOpen(open);
   };
 
-  const iconFilter = mode === 'dark' ? 'brightness(0) invert(1)' : 'brightness(0)';
-
   const menuOptions = [
-    { label: 'writing',   icon: '/menu/writing.svg',     href: '/writing'  },
-    { label: 'photos',    icon: '/menu/photography.svg', href: '/photos'   },
-    { label: 'programs', icon: '/menu/programs.svg',     href: '/programs' },
-    { label: 'about',    icon: '/menu/about.svg',        href: '/about'    },
+    { label: 'writing',  href: '/writing'  },
+    { label: 'photography',   href: '/photos'   },
+    { label: 'programs', href: '/programs' },
+    { label: 'about',    href: '/about'    },
   ];
   const list = (
     <Box
@@ -70,7 +68,6 @@ export default function AppBar() {
             <ListItemButton component={Link} href={item.href}
               sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, py: 2 }}
             >
-              <img src={item.icon} alt={item.label} width={32} height={32} style={{ filter: iconFilter }} />
               <ListItemText primary={item.label} sx={{ textTransform: 'lowercase', m: 0 }} />
             </ListItemButton>
           </ListItem>
@@ -96,12 +93,11 @@ export default function AppBar() {
               {!isMobile && (
                 <>
                   {menuOptions.map((item) => (
-                    <IconButton key={item.label} component={Link} href={item.href} color="inherit"
-                      aria-label={item.label}
-                      sx={{ '&:hover': { backgroundColor: 'transparent' } }}
+                    <Button key={item.label} component={Link} href={item.href} color="inherit"
+                      sx={{ textTransform: 'lowercase', '&:hover': { backgroundColor: 'transparent' } }}
                     >
-                      <img src={item.icon} alt={item.label} width={24} height={24} style={{ filter: iconFilter }} />
-                    </IconButton>
+                      {item.label}
+                    </Button>
                   ))}
                 </>
               )}

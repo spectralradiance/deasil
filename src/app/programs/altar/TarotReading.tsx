@@ -80,7 +80,8 @@ export default function TarotReading() {
                     style={{
                       transform: card.isReversed ? 'rotate(180deg)' : 'none',
                       display: 'block',
-                      margin: 'auto'
+                      margin: 'auto',
+                      filter: 'sepia(0.5)',
                     }}
                   />
                 </CardMedia>

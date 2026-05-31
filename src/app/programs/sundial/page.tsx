@@ -128,7 +128,7 @@ const AnalogClock = ({ date, sunrise, sunset }: { date: Date; sunrise?: Date | n
   const dayAngle = ((h + m / 60 + s / 3600) / 24) * 360 + 90;
   const rad = (dayAngle * Math.PI) / 180;
 
-  const ClockColors = ['#ffffff', '#FF8C00', '#0000ff', '#FFD700'];
+  const ClockColors = ['#fafad2', '#FF8C00', '#0000ff', '#FFD700'];
 
   // Solar noon = midpoint of sunrise/sunset; solar midnight = noon ± 12h
   const solarNoon = (sunrise && sunset)

@@ -4,7 +4,9 @@ import * as React from 'react';
 import { Card, CardMedia, CardContent, Typography, Box } from '@mui/material';
 import { client } from '../../sanity-client';
 import imageUrlBuilder from '@sanity/image-url';
-import { PortableText } from '@portabletext/react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { portableTextToMarkdown } from '@portabletext/markdown';
 import Link from "next/link";
 import TableOfContents from './TableOfContents';
 
@@ -72,30 +74,6 @@ export default function ArticleDetailPage() {
     fetchPost();
   }, [slug]);
 
-  const slugify = (text: string) => {
-    return text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
-  };
-
-  const components = {
-    block: {
-      h2: ({children}: any) => {
-        const text = children.map((child: any) => typeof child === 'string' ? child : child.props.children).join('');
-        const id = slugify(text);
-        return <Typography variant="h2" id={id} sx={{ mt: 4, mb: 2 }}>{children}</Typography>;
-      },
-      h3: ({children}: any) => {
-        const text = children.map((child: any) => typeof child === 'string' ? child : child.props.children).join('');
-        const id = slugify(text);
-        return <Typography variant="h3" id={id} sx={{ mt: 3, mb: 1 }}>{children}</Typography>;
-      },
-      h4: ({children}: any) => {
-        const text = children.map((child: any) => typeof child === 'string' ? child : child.props.children).join('');
-        const id = slugify(text);
-        return <Typography variant="h4" id={id} sx={{ mt: 2, mb: 1 }}>{children}</Typography>;
-      },
-    },
-  };
-
   if (!article) return <Box sx={{ p: 4 }}>Article not found.</Box>;
 
   return (
@@ -149,7 +127,11 @@ export default function ArticleDetailPage() {
             />
           </Card>
         )}
-        {article.body && <PortableText value={article.body} components={components} />}
+        {article.body && (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {portableTextToMarkdown(article.body)}
+          </ReactMarkdown>
+        )}
       </Box>
     </Box>
   );
