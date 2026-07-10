@@ -29,3 +29,4 @@ show hamburger menu on each page, expand to show icons
 ## Altar
 
 - https://www.kaggle.com/datasets/lsind18/tarot-json
+- receive a reading using your AI's browser
