@@ -1,13 +1,16 @@
 "use client";
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import tarot from './tarot-images.json';
 import Image from 'next/image';
 import {
   Button, Checkbox, Collapse, FormControl, FormControlLabel,
   InputLabel, MenuItem, Select, Box, Typography, Grid, Container,
-  useMediaQuery, useTheme, TextField,
+  useMediaQuery, useTheme, TextField, IconButton, Dialog, DialogTitle,
+  DialogContent, Divider,
 } from '@mui/material';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 import NumberField from '../../components/NumberField';
 
 interface SpreadPosition {
@@ -27,6 +30,7 @@ interface SpreadOption {
 const LAYOUT_CARD_W = 90;
 const LAYOUT_CARD_H = 158;
 const LAYOUT_GAP = 14;
+const CARDS_FADE_MS = 280;
 
 const SPREADS: SpreadOption[] = [
   { name: 'Single Card', count: 1, positions: [
@@ -116,6 +120,15 @@ interface CardData {
     light: string[];
     shadow: string[];
   };
+  fortune_telling?: string[];
+  Archetype?: string;
+  'Hebrew Alphabet'?: string;
+  Numerology?: string;
+  Elemental?: string;
+  'Mythical/Spiritual'?: string;
+  'Questions to Ask'?: string[];
+  Affirmation?: string;
+  Astrology?: string;
 }
 
 interface DrawnCard extends CardData {
@@ -133,16 +146,43 @@ const DEFAULT_FLIP: CardFlipState = { isFront: false, contentVisible: false, axi
 
 export default function TarotReading() {
   const [drawnCards, setDrawnCards] = useState<DrawnCard[]>([]);
+  const [modalCard, setModalCard] = useState<DrawnCard | null>(null);
   const [selectedSpread, setSelectedSpread] = useState<SpreadOption>(SPREADS[0]);
   const [customCount, setCustomCount] = useState(1);
   const [customPositionText, setCustomPositionText] = useState('');
   const [allowReversals, setAllowReversals] = useState(true);
   const [readingHasReversals, setReadingHasReversals] = useState(true);
   const [flipStates, setFlipStates] = useState<Map<number, CardFlipState>>(new Map());
+  const [cardsVisible, setCardsVisible] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const clearTimerRef = useRef<number | null>(null);
+  const fadeInFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (clearTimerRef.current !== null) {
+        window.clearTimeout(clearTimerRef.current);
+      }
+      if (fadeInFrameRef.current !== null) {
+        window.cancelAnimationFrame(fadeInFrameRef.current);
+      }
+    };
+  }, []);
 
   const getFlip = (index: number) => flipStates.get(index) ?? DEFAULT_FLIP;
 
   const drawCards = () => {
+    if (isClearing) return;
+
+    if (clearTimerRef.current !== null) {
+      window.clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = null;
+    }
+    if (fadeInFrameRef.current !== null) {
+      window.cancelAnimationFrame(fadeInFrameRef.current);
+      fadeInFrameRef.current = null;
+    }
+
     const count = selectedSpread.count ?? customCount;
     const newDrawnCards: DrawnCard[] = [];
     const availableCards = [...tarot.cards];
@@ -156,12 +196,31 @@ export default function TarotReading() {
     }
     setReadingHasReversals(allowReversals);
     setFlipStates(new Map());
+    setCardsVisible(false);
+    setIsClearing(false);
     setDrawnCards(newDrawnCards);
+
+    fadeInFrameRef.current = window.requestAnimationFrame(() => {
+      setCardsVisible(true);
+      fadeInFrameRef.current = null;
+    });
   };
 
   const clearCards = () => {
-    setDrawnCards([]);
-    setFlipStates(new Map());
+    if (drawnCards.length === 0 || isClearing) return;
+
+    if (clearTimerRef.current !== null) {
+      window.clearTimeout(clearTimerRef.current);
+    }
+
+    setIsClearing(true);
+    setCardsVisible(false);
+    clearTimerRef.current = window.setTimeout(() => {
+      setDrawnCards([]);
+      setFlipStates(new Map());
+      setIsClearing(false);
+      clearTimerRef.current = null;
+    }, CARDS_FADE_MS);
   };
 
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>, index: number) => {
@@ -202,16 +261,18 @@ export default function TarotReading() {
   const naturalGridH = (layoutRows + 1) * (350 + LAYOUT_GAP) - LAYOUT_GAP;
   const customPositionLines = customPositionText.split('\n').filter(l => l.trim().length > 0);
   const displayPositions: SpreadPosition[] | undefined = selectedSpread.count === null
-    ? customPositionLines.map(l => ({ name: l.trim(), description: '' }))
+    ? customPositionLines.map(l => {
+        const [name, ...rest] = l.trim().split(' - ');
+        return { name: name.trim(), description: rest.join(' - ').trim() };
+      })
     : selectedSpread.positions;
 
   return (
     <Container maxWidth={false}>
       <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        
         <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
           <Typography variant="h4">Altar</Typography>
-          <FormControl sx={{ minWidth: 220 }} disabled={drawnCards.length > 0}>
+          <FormControl sx={{ minWidth: 220 }} disabled={drawnCards.length > 0 || isClearing}>
             <InputLabel>Spread</InputLabel>
             <Select
               value={selectedSpread.name}
@@ -232,7 +293,7 @@ export default function TarotReading() {
               min={1}
               max={tarot.cards.length}
               sx={{ width: 175 }}
-              disabled={drawnCards.length > 0}
+              disabled={drawnCards.length > 0 || isClearing}
             />
           )}
           <FormControlLabel
@@ -240,14 +301,14 @@ export default function TarotReading() {
               <Checkbox
                 checked={allowReversals}
                 onChange={(e) => setAllowReversals(e.target.checked)}
-                disabled={drawnCards.length > 0}
+                disabled={drawnCards.length > 0 || isClearing}
               />
             }
             label="Reversals"
           />
           {drawnCards.length > 0
-            ? <Button variant="outlined" onClick={clearCards}>Clear</Button>
-            : <Button variant="contained" onClick={drawCards}>Draw</Button>
+            ? <Button variant="outlined" onClick={clearCards} disabled={isClearing}>Clear</Button>
+            : <Button variant="contained" onClick={drawCards} disabled={isClearing}>Draw</Button>
           }
         </Box>
         {selectedSpread.count === null && (
@@ -257,8 +318,8 @@ export default function TarotReading() {
             rows={Math.min(Math.max(customCount, 3), 10)}
             value={customPositionText}
             onChange={(e) => setCustomPositionText(e.target.value)}
-            placeholder="List position descriptions, one per line"
-            disabled={drawnCards.length > 0}
+            placeholder={`Position 1 - Description\nPosition 2 - Description\n...`}
+            disabled={drawnCards.length > 0 || isClearing}
             sx={{ width: 400, maxWidth: '100%', mt: 2 }}
           />
         )}
@@ -279,14 +340,22 @@ export default function TarotReading() {
                 if (!gridPos) return null;
                 const animName = `flip${phase === 'shrink' ? 'Shrink' : 'Grow'}${axis}`;
                 const pos = selectedSpread.positions?.[index];
-                const meanings = readingHasReversals
-                  ? (card.isReversed ? card.meanings.shadow : card.meanings.light)
-                  : card.meanings.light;
                 return (
-                  <Box key={index} sx={{ gridColumn: gridPos.col + 1, gridRow: gridPos.row + 1, display: 'flex', flexDirection: 'column' }}>
+                  <Box
+                    key={index}
+                    sx={{
+                      gridColumn: gridPos.col + 1,
+                      gridRow: gridPos.row + 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      opacity: cardsVisible ? 1 : 0,
+                      transition: `opacity ${CARDS_FADE_MS}ms ease, padding 0.3s ease`,
+                      py: contentVisible ? 2 : 0,
+                    }}
+                  >
                     <Collapse in={contentVisible} timeout={300}>
                       {pos && (
-                        <Box sx={{ mb: 1, textAlign: 'center', width: 'calc(100% + 60px)', marginLeft: '-30px', opacity: contentVisible ? 1 : 0, transition: 'opacity 0.3s' }}>
+                        <Box sx={{ mb: 1, textAlign: 'center', opacity: contentVisible ? 1 : 0, transition: 'opacity 0.3s' }}>
                           <Typography variant="subtitle2" fontWeight="bold">{pos.name}</Typography>
                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{pos.description}</Typography>
                         </Box>
@@ -321,17 +390,17 @@ export default function TarotReading() {
                       </Box>
                     </Box>
                     <Collapse in={contentVisible} timeout={300}>
-                      <Box sx={{ mt: 1, textAlign: 'center', width: 'calc(100% + 60px)', marginLeft: '-30px', opacity: contentVisible ? 1 : 0, transition: 'opacity 0.3s' }}>
+                      <Box sx={{ mt: 1, textAlign: 'center', opacity: contentVisible ? 1 : 0, transition: 'opacity 0.3s' }}>
                         <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           {card.name}{card.isReversed ? <AutorenewIcon fontSize="inherit" /> : null}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 1, textWrap: 'balance' }}>
                           {card.keywords.join(', ')}
                         </Typography>
-                        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                          {[...meanings].sort((a, b) => b.length - a.length).map((meaning, i) => (
-                            <Typography key={i} variant="body2" sx={{ display: 'block', textWrap: 'balance' }}>{meaning}</Typography>
-                          ))}
+                          <Box sx={{ mt: 0.5, display: 'flex', justifyContent: 'center' }}>
+                            <IconButton size="small" onClick={() => setModalCard(card)} aria-label="Card details">
+                              <InfoOutlinedIcon fontSize="small" />
+                            </IconButton>
                         </Box>
                       </Box>
                     </Collapse>
@@ -346,7 +415,7 @@ export default function TarotReading() {
               const { isFront, contentVisible, axis, phase } = getFlip(index);
               const animName = `flip${phase === 'shrink' ? 'Shrink' : 'Grow'}${axis}`;
               return (
-                <Grid item xs={12} sm={6} md={4} key={index}>
+                <Grid item xs={12} sm={6} md={4} key={index} sx={{ opacity: cardsVisible ? 1 : 0, transition: `opacity ${CARDS_FADE_MS}ms ease` }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <Collapse in={contentVisible} timeout={300}>
                       <Box sx={{ mb: 1, textAlign: 'center', minHeight: 40 }}>
@@ -391,16 +460,10 @@ export default function TarotReading() {
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textWrap: 'balance' }}>
                           {card.keywords.join(', ')}
                         </Typography>
-                        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                          {!readingHasReversals ? (
-                            ([...card.meanings.light].sort((a, b) => b.length - a.length).map((meaning, i) => (
-                              <Typography key={i} variant="body2" sx={{ textWrap: 'balance' }}>{meaning}</Typography>
-                            )))
-                          ) : (
-                            [...(card.isReversed ? card.meanings.shadow : card.meanings.light)].sort((a, b) => b.length - a.length).map((meaning, i) => (
-                              <Typography key={i} variant="body2" sx={{ textWrap: 'balance' }}>{meaning}</Typography>
-                            ))
-                          )}
+                        <Box sx={{ mt: 0.5, display: 'flex', justifyContent: 'center' }}>
+                          <IconButton size="small" onClick={() => setModalCard(card)} aria-label="Card details">
+                            <InfoOutlinedIcon fontSize="small" />
+                          </IconButton>
                         </Box>
                       </Box>
                     </Collapse>
@@ -411,6 +474,121 @@ export default function TarotReading() {
           </Grid>
         )}
       </Box>
+      {modalCard && (
+        <Dialog open onClose={() => setModalCard(null)} maxWidth="sm" fullWidth scroll="paper">
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h6">{modalCard.name}</Typography>
+              {modalCard.isReversed && <AutorenewIcon fontSize="small" />}
+            </Box>
+            <IconButton onClick={() => setModalCard(null)} size="small" edge="end" aria-label="Close">
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+              <Box sx={{ flexShrink: 0 }}>
+                <Image
+                  src={`/tarot-images/${modalCard.img}`}
+                  alt={modalCard.name}
+                  width={100}
+                  height={175}
+                  style={{
+                    objectFit: 'contain',
+                    filter: 'sepia(0.5)',
+                    ...(modalCard.isReversed ? { transform: 'rotate(180deg)' } : {}),
+                  }}
+                />
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <Typography variant="body2" color="text.secondary">
+                  {modalCard.keywords.join(' · ')}
+                </Typography>
+                {modalCard.Affirmation && (
+                  <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 1 }}>
+                    {modalCard.Affirmation}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+            <Divider sx={{ my: 1.5 }} />
+            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Light Meanings</Typography>
+            <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 1.5 }}>
+              {modalCard.meanings.light.map((m, i) => (
+                <Typography component="li" key={i} variant="body2">{m}</Typography>
+              ))}
+            </Box>
+            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Shadow Meanings</Typography>
+            <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 0 }}>
+              {modalCard.meanings.shadow.map((m, i) => (
+                <Typography component="li" key={i} variant="body2" color="text.secondary">{m}</Typography>
+              ))}
+            </Box>
+            {modalCard.fortune_telling && modalCard.fortune_telling.length > 0 && (
+              <>
+                <Divider sx={{ my: 1.5 }} />
+                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Fortune Telling</Typography>
+                <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 0 }}>
+                  {modalCard.fortune_telling.map((f, i) => (
+                    <Typography component="li" key={i} variant="body2">{f}</Typography>
+                  ))}
+                </Box>
+              </>
+            )}
+            <Divider sx={{ my: 1.5 }} />
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+              {modalCard.Archetype && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">Archetype</Typography>
+                  <Typography variant="body2">{modalCard.Archetype}</Typography>
+                </Box>
+              )}
+              {modalCard['Hebrew Alphabet'] && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">Hebrew Alphabet</Typography>
+                  <Typography variant="body2">{modalCard['Hebrew Alphabet']}</Typography>
+                </Box>
+              )}
+              {modalCard.Numerology && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">Numerology</Typography>
+                  <Typography variant="body2">{modalCard.Numerology}</Typography>
+                </Box>
+              )}
+              {modalCard.Elemental && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">Elemental</Typography>
+                  <Typography variant="body2">{modalCard.Elemental}</Typography>
+                </Box>
+              )}
+              {modalCard.Astrology && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">Astrology</Typography>
+                  <Typography variant="body2">{modalCard.Astrology}</Typography>
+                </Box>
+              )}
+            </Box>
+            {modalCard['Mythical/Spiritual'] && (
+              <>
+                <Divider sx={{ my: 1.5 }} />
+                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Mythical / Spiritual</Typography>
+                <Typography variant="body2">{modalCard['Mythical/Spiritual']}</Typography>
+              </>
+            )}
+            {modalCard['Questions to Ask'] && modalCard['Questions to Ask'].length > 0 && (
+              <>
+                <Divider sx={{ my: 1.5 }} />
+                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Questions to Ask</Typography>
+                <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 0 }}>
+                  {modalCard['Questions to Ask'].map((q, i) => (
+                    <Typography component="li" key={i} variant="body2">{q}</Typography>
+                  ))}
+                </Box>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </Container>
   );
 }
