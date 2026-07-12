@@ -36,7 +36,12 @@ show hamburger menu on each page, expand to show icons
 - Browse cards - all, minor/major, element
 - Include Runes - Eldar Futhark, Younger Futhark, Alglo-Saxon
 - Lenormand?
-- Tarot - use original texts - The 
+- Datasets used
+  - [Kaggle - Tarot Deck](https://www.kaggle.com/datasets/lsind18/tarot-json/data)
+  - [Kaggle - Tarotoo Tarot Card Meanings](https://www.kaggle.com/datasets/tarotoo/tarotoo-tarot-card-meanings)
+  - Not used: [Kaggle - Complete Tarot Card Meanings](https://www.kaggle.com/datasets/morrispoint/complete-tarot-card-meanings-all-78-cards), scraped from [here?](https://deckaura.com/blogs/guide/fool-tarot-meaning)
+- Playing cards - use tarot correspondances
+- If card is reversed: 
 
 ## Wiki
 
