@@ -1,16 +1,29 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
-import tarot from './tarot-images.json';
 import Image from 'next/image';
+import { enrichedCards, type EnrichedCard } from './tarot-data';
 import {
   Button, Checkbox, Collapse, FormControl, FormControlLabel,
   InputLabel, MenuItem, Select, Box, Typography, Grid, Container,
-  useMediaQuery, useTheme, TextField, IconButton, Dialog, DialogTitle,
-  DialogContent, Divider,
+  useMediaQuery, useTheme, TextField, IconButton, Dialog,
+  DialogContent, Divider, Chip,
 } from '@mui/material';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CloseIcon from '@mui/icons-material/Close';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import WorkIcon from '@mui/icons-material/Work';
+import MoodIcon from '@mui/icons-material/Mood';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import WhatshotIcon from '@mui/icons-material/Whatshot';
+import WaterDropIcon from '@mui/icons-material/WaterDrop';
+import AirIcon from '@mui/icons-material/Air';
+import LandscapeIcon from '@mui/icons-material/Landscape';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import CalculateIcon from '@mui/icons-material/Calculate';
+import FlareIcon from '@mui/icons-material/Flare';
+import QuestionMarkIcon from '@mui/icons-material/QuestionMark';
+import ThumbsUpDownIcon from '@mui/icons-material/ThumbsUpDown';
 import NumberField from '../../components/NumberField';
 
 interface SpreadPosition {
@@ -112,28 +125,39 @@ const SPREADS: SpreadOption[] = [
   { name: 'Custom', count: null },
 ];
 
-interface CardData {
-  name: string;
-  img: string;
-  keywords: string[];
-  meanings: {
-    light: string[];
-    shadow: string[];
-  };
-  fortune_telling?: string[];
-  Archetype?: string;
-  'Hebrew Alphabet'?: string;
-  Numerology?: string;
-  Elemental?: string;
-  'Mythical/Spiritual'?: string;
-  'Questions to Ask'?: string[];
-  Affirmation?: string;
-  Astrology?: string;
-}
-
-interface DrawnCard extends CardData {
+interface DrawnCard extends EnrichedCard {
   isReversed: boolean;
 }
+
+const PLANET_SYMBOLS: Record<string, string> = {
+  Sun: '\u2609\uFE0E', Moon: '\u263d\uFE0E', Mercury: '\u263f\uFE0E', Venus: '\u2640\uFE0E', Mars: '\u2642\uFE0E',
+  Jupiter: '\u2643\uFE0E', Saturn: '\u2644\uFE0E', Uranus: '\u2645\uFE0E', Neptune: '\u2646\uFE0E', Pluto: '\u2647\uFE0E',
+};
+
+const ZODIAC_SYMBOLS: Record<string, string> = {
+  Aries: '\u2648\uFE0E', Taurus: '\u2649\uFE0E', Gemini: '\u264a\uFE0E', Cancer: '\u264b\uFE0E', Leo: '\u264c\uFE0E', Virgo: '\u264d\uFE0E',
+  Libra: '\u264e\uFE0E', Scorpio: '\u264f\uFE0E', Sagittarius: '\u2650\uFE0E', Capricorn: '\u2651\uFE0E', Aquarius: '\u2652\uFE0E', Pisces: '\u2653\uFE0E',
+};
+
+const ELEMENT_STYLES: Record<string, { bgcolor: string; color: string }> = {
+  Fire:  { bgcolor: 'rgba(211,84,0,0.12)',    color: '#b03000' },
+  Water: { bgcolor: 'rgba(41,128,185,0.12)',   color: '#1a5276' },
+  Air:   { bgcolor: 'rgba(52,152,219,0.12)',   color: '#1a6fa8' },
+  Earth: { bgcolor: 'rgba(39,174,96,0.12)',    color: '#1e8449' },
+};
+
+const ELEMENT_ICONS: Record<string, React.ReactElement> = {
+  Fire:  <WhatshotIcon sx={{ fontSize: '0.875rem' }} />,
+  Water: <WaterDropIcon sx={{ fontSize: '0.875rem' }} />,
+  Air:   <AirIcon sx={{ fontSize: '0.875rem' }} />,
+  Earth: <LandscapeIcon sx={{ fontSize: '0.875rem' }} />,
+};
+
+const YES_NO_STYLES: Record<string, { color: string; label: string }> = {
+  yes:   { color: 'success.main', label: 'Yes' },
+  no:    { color: 'error.main',   label: 'No' },
+  maybe: { color: 'warning.main', label: 'Maybe' },
+};
 
 interface CardFlipState {
   isFront: boolean;
@@ -147,6 +171,9 @@ const DEFAULT_FLIP: CardFlipState = { isFront: false, contentVisible: false, axi
 export default function TarotReading() {
   const [drawnCards, setDrawnCards] = useState<DrawnCard[]>([]);
   const [modalCard, setModalCard] = useState<DrawnCard | null>(null);
+  const [openContext, setOpenContext] = useState<
+    'love' | 'career' | 'mood' | 'spiritual' | 'yes_no' | 'fortune_telling' | 'numerology' | 'astrology' | 'questions' | null
+  >(null);
   const [selectedSpread, setSelectedSpread] = useState<SpreadOption>(SPREADS[0]);
   const [customCount, setCustomCount] = useState(1);
   const [customPositionText, setCustomPositionText] = useState('');
@@ -185,12 +212,12 @@ export default function TarotReading() {
 
     const count = selectedSpread.count ?? customCount;
     const newDrawnCards: DrawnCard[] = [];
-    const availableCards = [...tarot.cards];
+    const availableCards = [...enrichedCards];
 
     for (let i = 0; i < count; i++) {
       if (availableCards.length === 0) break;
       const randomIndex = Math.floor(Math.random() * availableCards.length);
-      const card = availableCards.splice(randomIndex, 1)[0] as unknown as CardData;
+      const card = availableCards.splice(randomIndex, 1)[0];
       const isReversed = allowReversals && Math.random() < 0.5;
       newDrawnCards.push({ ...card, isReversed });
     }
@@ -267,6 +294,8 @@ export default function TarotReading() {
       })
     : selectedSpread.positions;
 
+  const modalIsReversed = Boolean(modalCard?.isReversed) && readingHasReversals;
+
   return (
     <Container maxWidth={false}>
       <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -291,7 +320,7 @@ export default function TarotReading() {
               value={customCount}
               onValueChange={(val) => setCustomCount(val ?? 1)}
               min={1}
-              max={tarot.cards.length}
+              max={enrichedCards.length}
               sx={{ width: 175 }}
               disabled={drawnCards.length > 0 || isClearing}
             />
@@ -475,117 +504,283 @@ export default function TarotReading() {
         )}
       </Box>
       {modalCard && (
-        <Dialog open onClose={() => setModalCard(null)} maxWidth="sm" fullWidth scroll="paper">
-          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="h6">{modalCard.name}</Typography>
-              {modalCard.isReversed && <AutorenewIcon fontSize="small" />}
+        <Dialog
+          open
+          onClose={() => { setModalCard(null); setOpenContext(null); }}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{ sx: { height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column' } }}
+        >
+          <DialogContent sx={{ padding: '0 !important', display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            {/* Left: full-height card image */}
+            <Box
+              sx={{
+                width: '50%',
+                flexShrink: 0,
+                position: 'relative',
+                borderRight: 1,
+                borderColor: 'divider',
+              }}
+            >
+              <Image
+                src={`/tarot-images/${modalCard.img}`}
+                alt={modalCard.name}
+                fill
+                style={{ objectFit: 'contain', filter: 'sepia(0.5)' }}
+              />
             </Box>
-            <IconButton onClick={() => setModalCard(null)} size="small" edge="end" aria-label="Close">
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent dividers>
-            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-              <Box sx={{ flexShrink: 0 }}>
-                <Image
-                  src={`/tarot-images/${modalCard.img}`}
-                  alt={modalCard.name}
-                  width={100}
-                  height={175}
-                  style={{
-                    objectFit: 'contain',
-                    filter: 'sepia(0.5)',
-                    ...(modalCard.isReversed ? { transform: 'rotate(180deg)' } : {}),
-                  }}
-                />
+            {/* Right: scrollable content */}
+            <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
+              {/* Title + close */}
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <Typography variant="h5" component="h2">{modalCard.name}</Typography>
+                </Box>
+                <IconButton
+                  onClick={() => { setModalCard(null); setOpenContext(null); }}
+                  size="small"
+                  aria-label="Close"
+                  sx={{ flexShrink: 0, ml: 1 }}
+                >
+                  <CloseIcon />
+                </IconButton>
               </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
-                  {modalCard.keywords.join(' · ')}
-                </Typography>
-                {modalCard.Affirmation && (
-                  <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 1 }}>
-                    {modalCard.Affirmation}
-                  </Typography>
+              {/* Attribute chips */}
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                {modalCard.element && ELEMENT_ICONS[modalCard.element] && (
+                  <Chip
+                    label={modalCard.element}
+                    size="small"
+                    icon={ELEMENT_ICONS[modalCard.element]}
+                    sx={{ bgcolor: 'transparent' }}
+                  />
                 )}
+                {modalCard.planet && (
+                  <Chip
+                    label={`${PLANET_SYMBOLS[modalCard.planet] ?? ''} ${modalCard.planet}`}
+                    size="small"
+                    sx={{ fontFamily: 'serif', bgcolor: 'transparent' }}
+                  />
+                )}
+                {modalCard.zodiac && modalCard.zodiac.split(',').map(z => z.trim()).filter(Boolean).map(z => (
+                  <Chip
+                    key={z}
+                    label={`${ZODIAC_SYMBOLS[z] ?? ''} ${z}`}
+                    size="small"
+                    sx={{ fontFamily: 'serif', bgcolor: 'transparent' }}
+                  />
+                ))}
               </Box>
+              {(
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', mb: 1 }}>
+                  {modalIsReversed ? modalCard.meaning_reversed : modalCard.meaning_upright}
+                </Typography>
+              )}
+              {modalCard.Affirmation && !modalIsReversed && (
+                <Typography variant="body2" sx={{ fontStyle: 'italic', opacity: 0.75, mb: 1 }}>
+                  {modalCard.Affirmation}
+                </Typography>
+              )}
+              {/* Keywords */}
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
+                {(modalIsReversed
+                  ? (modalCard.keywords_reversed ?? modalCard.keywords)
+                  : modalCard.keywords
+                ).map((kw, i) => (
+                  <Chip
+                    key={i} label={kw} size="small"
+                    sx={{ bgcolor: 'transparent' }}
+                  />
+                ))}
+              </Box>
+              <Divider sx={{ my: 1.5 }} />
+              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Light Meanings</Typography>
+              <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 1.5 }}>
+                {modalCard.meanings.light.map((m, i) => (
+                  <Typography component="li" key={i} variant="body2">{m}</Typography>
+                ))}
+              </Box>
+              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Shadow Meanings</Typography>
+              <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 0 }}>
+                {modalCard.meanings.shadow.map((m, i) => (
+                  <Typography component="li" key={i} variant="body2">{m}</Typography>
+                ))}
+              </Box>
+              {/* Context icons — click to reveal */}
+              {(modalCard.love || modalCard.career || modalCard.mood || modalCard.spiritual || modalCard.yes_no) && (
+                <>
+                  <Divider sx={{ my: 1.5 }} />
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                    {modalCard.yes_no && (
+                      <Chip
+                        size="small"
+                        icon={<ThumbsUpDownIcon />}
+                        label="Yes / No"
+                        onClick={() => setOpenContext(openContext === 'yes_no' ? null : 'yes_no')}
+                        sx={openContext === 'yes_no' && modalCard.yes_no && YES_NO_STYLES[modalCard.yes_no]
+                          ? { bgcolor: 'transparent', color: YES_NO_STYLES[modalCard.yes_no].color, '& .MuiChip-icon': { color: 'inherit' } }
+                          : { bgcolor: 'transparent', color: 'text.disabled', '& .MuiChip-icon': { color: 'inherit' } }}
+                      />
+                    )}
+                    {modalCard.love && (
+                      <Chip
+                        size="small"
+                        icon={<FavoriteIcon />}
+                        label="Love"
+                        onClick={() => setOpenContext(openContext === 'love' ? null : 'love')}
+                        sx={openContext === 'love'
+                          ? { bgcolor: 'transparent', color: 'error.main', '& .MuiChip-icon': { color: 'inherit' } }
+                          : { bgcolor: 'transparent', color: 'text.disabled', '& .MuiChip-icon': { color: 'inherit' } }}
+                      />
+                    )}
+                    {modalCard.career && (
+                      <Chip
+                        size="small"
+                        icon={<WorkIcon />}
+                        label="Career"
+                        onClick={() => setOpenContext(openContext === 'career' ? null : 'career')}
+                        sx={openContext === 'career'
+                          ? { bgcolor: 'transparent', color: 'primary.main', '& .MuiChip-icon': { color: 'inherit' } }
+                          : { bgcolor: 'transparent', color: 'text.disabled', '& .MuiChip-icon': { color: 'inherit' } }}
+                      />
+                    )}
+                    {modalCard.mood && (
+                      <Chip
+                        size="small"
+                        icon={<MoodIcon />}
+                        label="Mood"
+                        onClick={() => setOpenContext(openContext === 'mood' ? null : 'mood')}
+                        sx={openContext === 'mood'
+                          ? { bgcolor: 'transparent', color: 'warning.main', '& .MuiChip-icon': { color: 'inherit' } }
+                          : { bgcolor: 'transparent', color: 'text.disabled', '& .MuiChip-icon': { color: 'inherit' } }}
+                      />
+                    )}
+                    {modalCard.spiritual && (
+                      <Chip
+                        size="small"
+                        icon={<AutoAwesomeIcon />}
+                        label="Spiritual"
+                        onClick={() => setOpenContext(openContext === 'spiritual' ? null : 'spiritual')}
+                        sx={openContext === 'spiritual'
+                          ? { bgcolor: 'transparent', color: 'secondary.main', '& .MuiChip-icon': { color: 'inherit' } }
+                          : { bgcolor: 'transparent', color: 'text.disabled', '& .MuiChip-icon': { color: 'inherit' } }}
+                      />
+                    )}
+                    {modalCard.fortune_telling && modalCard.fortune_telling.length > 0 && (
+                      <Chip
+                        size="small"
+                        icon={<AutoFixHighIcon />}
+                        label="Fortune Telling"
+                        onClick={() => setOpenContext(openContext === 'fortune_telling' ? null : 'fortune_telling')}
+                        sx={openContext === 'fortune_telling'
+                          ? { bgcolor: 'transparent', color: 'secondary.main', '& .MuiChip-icon': { color: 'inherit' } }
+                          : { bgcolor: 'transparent', color: 'text.disabled', '& .MuiChip-icon': { color: 'inherit' } }}
+                      />
+                    )}
+                    {modalCard.Numerology && (
+                      <Chip
+                        size="small"
+                        icon={<CalculateIcon />}
+                        label="Numerology"
+                        onClick={() => setOpenContext(openContext === 'numerology' ? null : 'numerology')}
+                        sx={openContext === 'numerology'
+                          ? { bgcolor: 'transparent', color: 'success.main', '& .MuiChip-icon': { color: 'inherit' } }
+                          : { bgcolor: 'transparent', color: 'text.disabled', '& .MuiChip-icon': { color: 'inherit' } }}
+                      />
+                    )}
+                    {modalCard.Astrology && (
+                      <Chip
+                        size="small"
+                        icon={<FlareIcon />}
+                        label="Astrology"
+                        onClick={() => setOpenContext(openContext === 'astrology' ? null : 'astrology')}
+                        sx={openContext === 'astrology'
+                          ? { bgcolor: 'transparent', color: 'warning.dark', '& .MuiChip-icon': { color: 'inherit' } }
+                          : { bgcolor: 'transparent', color: 'text.disabled', '& .MuiChip-icon': { color: 'inherit' } }}
+                      />
+                    )}
+                    {modalCard['Questions to Ask'] && modalCard['Questions to Ask'].length > 0 && (
+                      <Chip
+                        size="small"
+                        icon={<QuestionMarkIcon />}
+                        label="Questions"
+                        onClick={() => setOpenContext(openContext === 'questions' ? null : 'questions')}
+                        sx={openContext === 'questions'
+                          ? { bgcolor: 'transparent', color: 'text.secondary', '& .MuiChip-icon': { color: 'inherit' } }
+                          : { bgcolor: 'transparent', color: 'text.disabled', '& .MuiChip-icon': { color: 'inherit' } }}
+                      />
+                    )}
+                  </Box>
+                  <Collapse in={openContext !== null}>
+                    <Box sx={{ mt: 0.75, textAlign: 'center' }}>
+                      {openContext === 'yes_no' ? (
+                        <Typography variant="body2">
+                          {modalCard.yes_no ? (YES_NO_STYLES[modalCard.yes_no]?.label ?? '') : ''}
+                        </Typography>
+                      ) : openContext === 'fortune_telling' ? (
+                        <Box component="ul" sx={{ pl: 2, mt: 0, mb: 0 }}>
+                          {modalCard.fortune_telling?.map((f, i) => (
+                            <Typography component="li" key={i} variant="body2">{f}</Typography>
+                          ))}
+                        </Box>
+                      ) : openContext === 'questions' ? (
+                        <Box component="ul" sx={{ pl: 2, mt: 0, mb: 0 }}>
+                          {modalCard['Questions to Ask']?.map((q, i) => (
+                            <Typography component="li" key={i} variant="body2">{q}</Typography>
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="body2">
+                          {openContext === 'love' ? modalCard.love
+                            : openContext === 'career' ? modalCard.career
+                            : openContext === 'mood' ? modalCard.mood
+                            : openContext === 'spiritual' ? modalCard.spiritual
+                            : openContext === 'numerology' ? modalCard.Numerology
+                            : openContext === 'astrology' ? modalCard.Astrology
+                            : ''}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Collapse>
+                </>
+              )}
+              {/* Waite content */}
+              {(modalCard.waite_divinatory || modalCard.waite_reversed || modalCard.waite_description) && (
+                <>
+                  <Divider sx={{ my: 1.5 }} />
+                  {modalCard.waite_divinatory && (
+                    <Box sx={{ mb: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                        Waite · Divinatory
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                        {modalCard.waite_divinatory}
+                      </Typography>
+                    </Box>
+                  )}
+                  {modalCard.waite_reversed && (
+                    <Box sx={{ mb: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                        Waite · Reversed
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                        {modalCard.waite_reversed}
+                      </Typography>
+                    </Box>
+                  )}
+                  {modalCard.waite_description && (
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                        Description
+                      </Typography>
+                      <Typography variant="body2" sx={{ lineHeight: 1.65 }}>
+                        {modalCard.waite_description}
+                      </Typography>
+                    </Box>
+                  )}
+                </>
+              )}
             </Box>
-            <Divider sx={{ my: 1.5 }} />
-            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Light Meanings</Typography>
-            <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 1.5 }}>
-              {modalCard.meanings.light.map((m, i) => (
-                <Typography component="li" key={i} variant="body2">{m}</Typography>
-              ))}
-            </Box>
-            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Shadow Meanings</Typography>
-            <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 0 }}>
-              {modalCard.meanings.shadow.map((m, i) => (
-                <Typography component="li" key={i} variant="body2" color="text.secondary">{m}</Typography>
-              ))}
-            </Box>
-            {modalCard.fortune_telling && modalCard.fortune_telling.length > 0 && (
-              <>
-                <Divider sx={{ my: 1.5 }} />
-                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Fortune Telling</Typography>
-                <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 0 }}>
-                  {modalCard.fortune_telling.map((f, i) => (
-                    <Typography component="li" key={i} variant="body2">{f}</Typography>
-                  ))}
-                </Box>
-              </>
-            )}
-            <Divider sx={{ my: 1.5 }} />
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-              {modalCard.Archetype && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary" display="block">Archetype</Typography>
-                  <Typography variant="body2">{modalCard.Archetype}</Typography>
-                </Box>
-              )}
-              {modalCard['Hebrew Alphabet'] && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary" display="block">Hebrew Alphabet</Typography>
-                  <Typography variant="body2">{modalCard['Hebrew Alphabet']}</Typography>
-                </Box>
-              )}
-              {modalCard.Numerology && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary" display="block">Numerology</Typography>
-                  <Typography variant="body2">{modalCard.Numerology}</Typography>
-                </Box>
-              )}
-              {modalCard.Elemental && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary" display="block">Elemental</Typography>
-                  <Typography variant="body2">{modalCard.Elemental}</Typography>
-                </Box>
-              )}
-              {modalCard.Astrology && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary" display="block">Astrology</Typography>
-                  <Typography variant="body2">{modalCard.Astrology}</Typography>
-                </Box>
-              )}
-            </Box>
-            {modalCard['Mythical/Spiritual'] && (
-              <>
-                <Divider sx={{ my: 1.5 }} />
-                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Mythical / Spiritual</Typography>
-                <Typography variant="body2">{modalCard['Mythical/Spiritual']}</Typography>
-              </>
-            )}
-            {modalCard['Questions to Ask'] && modalCard['Questions to Ask'].length > 0 && (
-              <>
-                <Divider sx={{ my: 1.5 }} />
-                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Questions to Ask</Typography>
-                <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 0 }}>
-                  {modalCard['Questions to Ask'].map((q, i) => (
-                    <Typography component="li" key={i} variant="body2">{q}</Typography>
-                  ))}
-                </Box>
-              </>
-            )}
           </DialogContent>
         </Dialog>
       )}
