@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import {
   Box, Typography, IconButton, Dialog, DialogContent,
-  Divider, Chip, Collapse,
+  Divider, Chip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import FavoriteIcon from '@mui/icons-material/Favorite';
@@ -21,7 +21,6 @@ import AirIcon from '@mui/icons-material/Air';
 import LandscapeIcon from '@mui/icons-material/Landscape';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
-import TransitionGroup from 'react-transition-group/TransitionGroup';
 import { PLANET_SYMBOLS, ZODIAC_SYMBOLS, YES_NO_STYLES, type DrawnCard } from './tarot-constants';
 
 // ── Local icon map ────────────────────────────────────────────────────────────
@@ -235,16 +234,9 @@ export default function CardModal({ modalCard, modalIsReversed, onClose }: CardM
             (modalCard['Questions to Ask'] && modalCard['Questions to Ask'].length > 0)) && (
             <>
               <Divider sx={{ my: 1.5 }} />
-              {/*
-               * TransitionGroup animates chips entering and exiting the list
-               * (e.g. when the page first renders or cards change).
-               * Each Collapse child is keyed by field name so React / TransitionGroup
-               * can track identity across reorders.
-               * CSS `transition` on each chip pill handles the colour fade.
-               */}
-              <Box>
-                <TransitionGroup>
-                  {chipOrder.flatMap((key): React.ReactElement[] => {
+              {/* Chips wrap inline; expanded chips show their value and a full-height cycle zone */}
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                {chipOrder.flatMap((key): React.ReactElement[] => {
                     // Resolve chip params for this key; return [] to skip chips the card lacks
                     let color = '';
                     let icon: React.ReactElement = <></>;
@@ -274,7 +266,7 @@ export default function CardModal({ modalCard, modalIsReversed, onClose }: CardM
                     } else if (key === 'fortune_telling' && modalCard.fortune_telling?.length) {
                       color = 'secondary.dark';
                       icon  = <AutoFixHighIcon sx={{ fontSize: '1rem', mt: '1px', flexShrink: 0 }} />;
-                      label = 'Fortune Telling';
+                      label = 'Fortune';
                       value = modalCard.fortune_telling[fortuneIndex % modalCard.fortune_telling.length];
                       if (modalCard.fortune_telling.length > 1)
                         cycleNext = () => setFortuneIndex(i => (i + 1) % modalCard.fortune_telling!.length);
@@ -291,43 +283,51 @@ export default function CardModal({ modalCard, modalIsReversed, onClose }: CardM
 
                     const isOpen = openContexts.has(key);
                     return [(
-                      // Collapse gives a smooth enter/exit height animation via TransitionGroup
-                      <Collapse key={key} timeout={300}>
+                      <Box
+                        key={key}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'stretch',
+                          borderRadius: '12px',
+                          // Fade between transparent (collapsed) and solid colour (expanded)
+                          bgcolor: isOpen ? color : 'transparent',
+                          color: 'common.white',
+                          transition: 'background-color 0.25s ease',
+                          userSelect: 'none',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {/* Main area: clicking here toggles open/closed; icon always centred */}
                         <Box
                           onClick={() => toggleContext(key)}
-                          sx={{
-                            display: 'flex', alignItems: 'flex-start', gap: 0.75,
-                            px: 1.5, py: 0.75, mb: 0.75,
-                            borderRadius: '12px',
-                            // Fade between transparent (collapsed) and solid colour (expanded)
-                            bgcolor: isOpen ? color : 'transparent',
-                            color:   'common.white',
-                            cursor: 'pointer',
-                            userSelect: 'none',
-                            transition: 'background-color 0.25s ease, color 0.25s ease',
-                          }}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flex: 1, px: 1.5, py: 0.75, cursor: 'pointer' }}
                         >
                           {icon}
-                          <Typography variant="body2" sx={{ lineHeight: 1.5, flex: 1 }}>
+                          <Typography variant="body2" sx={{ lineHeight: 1.5 }}>
                             <Box component="span" sx={{ fontWeight: 600 }}>{label}</Box>
                             {isOpen && <>: {value}</>}
                           </Typography>
-                          {isOpen && cycleNext && (
-                            <IconButton
-                              size="small"
-                              onClick={(e) => { e.stopPropagation(); cycleNext!(); }}
-                              sx={{ color: 'inherit', p: 0, ml: 0.5, flexShrink: 0, alignSelf: 'center' }}
-                              aria-label={`Next ${label.toLowerCase()}`}
-                            >
-                              <NavigateNextIcon sx={{ fontSize: '1.1rem' }} />
-                            </IconButton>
-                          )}
                         </Box>
-                      </Collapse>
+                        {/* Cycle area: full-height right zone, only present when open with multiple values */}
+                        {isOpen && cycleNext && (
+                          <Box
+                            onClick={(e) => { e.stopPropagation(); cycleNext!(); }}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              px: 1,
+                              cursor: 'pointer',
+                              bgcolor: 'rgba(0,0,0,0.15)',
+                              '&:hover': { bgcolor: 'rgba(0,0,0,0.25)' },
+                            }}
+                          >
+                            <NavigateNextIcon sx={{ fontSize: '1.1rem' }} />
+                          </Box>
+                        )}
+                      </Box>
                     )];
                   })}
-                </TransitionGroup>
-              </Box>
+                </Box>
             </>
           )}
 
