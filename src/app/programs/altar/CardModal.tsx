@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import {
   Box, Typography, IconButton, Dialog, DialogContent,
-  Divider, Chip,
+  Divider, Chip, Collapse,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import FavoriteIcon from '@mui/icons-material/Favorite';
@@ -21,6 +21,7 @@ import AirIcon from '@mui/icons-material/Air';
 import LandscapeIcon from '@mui/icons-material/Landscape';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
+import TransitionGroup from 'react-transition-group/TransitionGroup';
 import { PLANET_SYMBOLS, ZODIAC_SYMBOLS, YES_NO_STYLES, type DrawnCard } from './tarot-constants';
 
 // ── Local icon map ────────────────────────────────────────────────────────────
@@ -72,30 +73,77 @@ interface CardModalProps {
  * a new card's modal is opened (the component unmounts then remounts).
  */
 export default function CardModal({ modalCard, modalIsReversed, onClose }: CardModalProps) {
-  // Which context chips are currently expanded (keyed by field name)
-  const [openContexts, setOpenContexts] = useState<Set<string>>(new Set());
-  // Current index within array-valued context fields (fortune telling, questions to ask)
+  // Selected chip keys in the order they were clicked (oldest first = top of list)
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  // Display indices for array-valued fields; randomised to a fresh entry on each open
   const [fortuneIndex, setFortuneIndex] = useState(0);
   const [questionsIndex, setQuestionsIndex] = useState(0);
-  // Display order; opening a chip promotes it to index 0
-  const [chipOrder, setChipOrder] = useState([
-    'yes_no', 'love', 'career', 'mood', 'spiritual',
-    'affirmation', 'numerology', 'astrology', 'fortune_telling', 'questions',
-  ]);
 
-  /** Expand or collapse a chip; expanding also moves it to the top of the list */
+  /**
+   * Select a chip: move it to the opened section and randomise its start index
+   * if it cycles through multiple values. Deselect: collapse it back to the pool.
+   */
   const toggleContext = (key: string) => {
-    setOpenContexts(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-        setChipOrder(order => [key, ...order.filter(k => k !== key)]);
+    setSelectedKeys(prev => {
+      if (prev.includes(key)) {
+        // Deselect: remove from the opened list
+        return prev.filter(k => k !== key);
       }
-      return next;
+      // Select: randomise the starting position for cycled fields
+      if (key === 'fortune_telling' && modalCard.fortune_telling?.length) {
+        setFortuneIndex(Math.floor(Math.random() * modalCard.fortune_telling.length));
+      }
+      if (key === 'questions' && modalCard['Questions to Ask']?.length) {
+        setQuestionsIndex(Math.floor(Math.random() * modalCard['Questions to Ask'].length));
+      }
+      // Append so the first-clicked chip stays at the top of the selected section
+      return [...prev, key];
     });
   };
+
+  /** Resolve display data for a chip key; returns null when the card lacks that field */
+  const resolveChip = (key: string): {
+    color: string; icon: React.ReactElement; label: string;
+    value: React.ReactNode; cycleNext?: () => void;
+  } | null => {
+    if (key === 'yes_no' && modalCard.yes_no && YES_NO_STYLES[modalCard.yes_no]) {
+      return { color: YES_NO_STYLES[modalCard.yes_no].color, icon: <ThumbsUpDownIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />, label: 'Yes / No', value: YES_NO_STYLES[modalCard.yes_no].label };
+    }
+    if (key === 'love' && modalCard.love) return { color: 'error.main', icon: <FavoriteIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />, label: 'Love', value: modalCard.love };
+    if (key === 'career' && modalCard.career) return { color: 'primary.main', icon: <WorkIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />, label: 'Career', value: modalCard.career };
+    if (key === 'mood' && modalCard.mood) return { color: 'warning.main', icon: <MoodIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />, label: 'Mood', value: modalCard.mood };
+    if (key === 'spiritual' && modalCard.spiritual) return { color: 'secondary.main', icon: <AutoAwesomeIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />, label: 'Spiritual', value: modalCard.spiritual };
+    if (key === 'affirmation' && modalCard.Affirmation) return { color: 'success.main', icon: <CampaignIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />, label: 'Affirmation', value: modalCard.Affirmation };
+    if (key === 'numerology' && modalCard.Numerology) return { color: 'success.dark', icon: <CalculateIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />, label: 'Numerology', value: modalCard.Numerology };
+    if (key === 'astrology' && modalCard.Astrology) return { color: 'warning.dark', icon: <FlareIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />, label: 'Astrology', value: modalCard.Astrology };
+    if (key === 'fortune_telling' && modalCard.fortune_telling?.length) {
+      return {
+        color: 'secondary.dark', icon: <AutoFixHighIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />,
+        label: 'Fortune',
+        value: modalCard.fortune_telling[fortuneIndex % modalCard.fortune_telling.length],
+        cycleNext: modalCard.fortune_telling.length > 1
+          ? () => setFortuneIndex(i => (i + 1) % modalCard.fortune_telling!.length)
+          : undefined,
+      };
+    }
+    if (key === 'questions' && modalCard['Questions to Ask']?.length) {
+      return {
+        color: 'grey.600', icon: <QuestionMarkIcon sx={{ fontSize: '1rem', flexShrink: 0 }} />,
+        label: 'Questions',
+        value: modalCard['Questions to Ask'][questionsIndex % modalCard['Questions to Ask'].length],
+        cycleNext: modalCard['Questions to Ask'].length > 1
+          ? () => setQuestionsIndex(i => (i + 1) % modalCard['Questions to Ask']!.length)
+          : undefined,
+      };
+    }
+    return null;
+  };
+
+  // Chips the user has opened, in click order (first clicked = index 0 = top)
+  const openChipKeys = selectedKeys.filter(k => Boolean(resolveChip(k)));
+  // Remaining chips in alphabetical label order
+  const ALL_ALPHA = ['affirmation', 'astrology', 'career', 'fortune_telling', 'love', 'mood', 'numerology', 'questions', 'spiritual', 'yes_no'];
+  const closedChipKeys = ALL_ALPHA.filter(k => !selectedKeys.includes(k) && Boolean(resolveChip(k)));
 
   return (
     <Dialog
@@ -166,20 +214,12 @@ export default function CardModal({ modalCard, modalIsReversed, onClose }: CardM
             ))}
           </Box>
 
-          {/* Upright or reversed meaning text */}
-          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', mb: 1 }}>
-            Upright Meaning: {modalCard.meaning_upright}<br/><br/>
-            Reversed Meaning: {modalCard.meaning_reversed}<br/><br/>
-            Keywords Reversed: {modalCard.keywords_reversed?.join(', ') ?? 'N/A'}<br/><br/>
-            Keywords Upright: {modalCard.keywords?.join(', ') ?? 'N/A'}
-          </Typography>
-
           {/* ── Keywords ─────────────────────────────────────────────────── */}
           {/* Switches to the reversed keyword set when the card is reversed */}
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
             {(modalIsReversed
-              ? (modalCard.keywords_reversed ?? modalCard.keywords)
-              : modalCard.keywords
+              ? (modalCard.keywords_reversed ?? modalCard.keywords_upright)
+              : modalCard.keywords_upright
             ).map((kw, i) => (
               <Chip key={i} label={kw} size="small" sx={{ bgcolor: 'transparent' }} />
             ))}
@@ -225,109 +265,87 @@ export default function CardModal({ modalCard, modalIsReversed, onClose }: CardM
           )}
 
           {/* ── Context chips ────────────────────────────────────────────── */}
-          {/* Each chip shows its value inline against a coloured background.   */}
-          {/* Chips with multiple values (Fortune Telling, Questions) show one  */}
-          {/* entry at a time; the › arrow cycles to the next.                  */}
-          {(modalCard.yes_no || modalCard.love || modalCard.career || modalCard.mood || modalCard.spiritual ||
-            modalCard.Affirmation || modalCard.Numerology || modalCard.Astrology ||
-            (modalCard.fortune_telling && modalCard.fortune_telling.length > 0) ||
-            (modalCard['Questions to Ask'] && modalCard['Questions to Ask'].length > 0)) && (
+          {/* Section 1: chips the user has opened (click order, oldest at top). */}
+          {/* Section 2: remaining chips in alphabetical order (inline wrap).    */}
+          {(openChipKeys.length > 0 || closedChipKeys.length > 0) && (
             <>
               <Divider sx={{ my: 1.5 }} />
-              {/* Chips wrap inline; expanded chips show their value and a full-height cycle zone */}
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                {chipOrder.flatMap((key): React.ReactElement[] => {
-                    // Resolve chip params for this key; return [] to skip chips the card lacks
-                    let color = '';
-                    let icon: React.ReactElement = <></>;
-                    let label = '';
-                    let value: React.ReactNode = null;
-                    let cycleNext: (() => void) | undefined;
 
-                    if (key === 'yes_no' && modalCard.yes_no && YES_NO_STYLES[modalCard.yes_no]) {
-                      color = YES_NO_STYLES[modalCard.yes_no].color;
-                      icon  = <ThumbsUpDownIcon sx={{ fontSize: '1rem', mt: '1px', flexShrink: 0 }} />;
-                      label = 'Yes / No';
-                      value = YES_NO_STYLES[modalCard.yes_no].label;
-                    } else if (key === 'love' && modalCard.love) {
-                      color = 'error.main'; icon = <FavoriteIcon sx={{ fontSize: '1rem', mt: '1px', flexShrink: 0 }} />; label = 'Love'; value = modalCard.love;
-                    } else if (key === 'career' && modalCard.career) {
-                      color = 'primary.main'; icon = <WorkIcon sx={{ fontSize: '1rem', mt: '1px', flexShrink: 0 }} />; label = 'Career'; value = modalCard.career;
-                    } else if (key === 'mood' && modalCard.mood) {
-                      color = 'warning.main'; icon = <MoodIcon sx={{ fontSize: '1rem', mt: '1px', flexShrink: 0 }} />; label = 'Mood'; value = modalCard.mood;
-                    } else if (key === 'spiritual' && modalCard.spiritual) {
-                      color = 'secondary.main'; icon = <AutoAwesomeIcon sx={{ fontSize: '1rem', mt: '1px', flexShrink: 0 }} />; label = 'Spiritual'; value = modalCard.spiritual;
-                    } else if (key === 'affirmation' && modalCard.Affirmation) {
-                      color = 'success.main'; icon = <CampaignIcon sx={{ fontSize: '1rem', mt: '1px', flexShrink: 0 }} />; label = 'Affirmation'; value = modalCard.Affirmation;
-                    } else if (key === 'numerology' && modalCard.Numerology) {
-                      color = 'success.dark'; icon = <CalculateIcon sx={{ fontSize: '1rem', mt: '1px', flexShrink: 0 }} />; label = 'Numerology'; value = modalCard.Numerology;
-                    } else if (key === 'astrology' && modalCard.Astrology) {
-                      color = 'warning.dark'; icon = <FlareIcon sx={{ fontSize: '1rem', mt: '1px', flexShrink: 0 }} />; label = 'Astrology'; value = modalCard.Astrology;
-                    } else if (key === 'fortune_telling' && modalCard.fortune_telling?.length) {
-                      color = 'secondary.dark';
-                      icon  = <AutoFixHighIcon sx={{ fontSize: '1rem', mt: '1px', flexShrink: 0 }} />;
-                      label = 'Fortune';
-                      value = modalCard.fortune_telling[fortuneIndex % modalCard.fortune_telling.length];
-                      if (modalCard.fortune_telling.length > 1)
-                        cycleNext = () => setFortuneIndex(i => (i + 1) % modalCard.fortune_telling!.length);
-                    } else if (key === 'questions' && modalCard['Questions to Ask']?.length) {
-                      color = 'grey.600';
-                      icon  = <QuestionMarkIcon sx={{ fontSize: '1rem', mt: '1px', flexShrink: 0 }} />;
-                      label = 'Question';
-                      value = modalCard['Questions to Ask'][questionsIndex % modalCard['Questions to Ask'].length];
-                      if (modalCard['Questions to Ask'].length > 1)
-                        cycleNext = () => setQuestionsIndex(i => (i + 1) % modalCard['Questions to Ask']!.length);
-                    } else {
-                      return []; // card doesn’t have data for this chip
-                    }
-
-                    const isOpen = openContexts.has(key);
-                    return [(
-                      <Box
-                        key={key}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'stretch',
-                          borderRadius: '12px',
-                          // Fade between transparent (collapsed) and solid colour (expanded)
-                          bgcolor: isOpen ? color : 'transparent',
-                          color: 'common.white',
-                          transition: 'background-color 0.25s ease',
-                          userSelect: 'none',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {/* Main area: clicking here toggles open/closed; icon always centred */}
-                        <Box
-                          onClick={() => toggleContext(key)}
-                          sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flex: 1, px: 1.5, py: 0.75, cursor: 'pointer' }}
-                        >
-                          {icon}
-                          <Typography variant="body2" sx={{ lineHeight: 1.5 }}>
-                            <Box component="span" sx={{ fontWeight: 600 }}>{label}</Box>
-                            {isOpen && <>: {value}</>}
-                          </Typography>
-                        </Box>
-                        {/* Cycle area: full-height right zone, only present when open with multiple values */}
-                        {isOpen && cycleNext && (
+              {/* ── Selected chips (TransitionGroup animates enter/exit) ─────── */}
+              {openChipKeys.length > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mb: closedChipKeys.length > 0 ? 0.75 : 0 }}>
+                  <TransitionGroup>
+                    {openChipKeys.map(key => {
+                      const chip = resolveChip(key)!;
+                      return (
+                        <Collapse key={key} timeout={250}>
                           <Box
-                            onClick={(e) => { e.stopPropagation(); cycleNext!(); }}
                             sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              px: 1,
-                              cursor: 'pointer',
-                              bgcolor: 'rgba(0,0,0,0.15)',
-                              '&:hover': { bgcolor: 'rgba(0,0,0,0.25)' },
+                              display: 'flex', alignItems: 'stretch',
+                              borderRadius: '12px',
+                              bgcolor: chip.color,
+                              color: 'common.white',
+                              userSelect: 'none',
+                              overflow: 'hidden',
+                              mb: 0.75,
                             }}
                           >
-                            <NavigateNextIcon sx={{ fontSize: '1.1rem' }} />
+                            {/* Main area — click to deselect and collapse back to the pool */}
+                            <Box
+                              onClick={() => toggleContext(key)}
+                              sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flex: 1, px: 1.5, py: 0.75, cursor: 'pointer' }}
+                            >
+                              {chip.icon}
+                              <Typography variant="body2" sx={{ lineHeight: 1.5 }}>
+                                <Box component="span" sx={{ fontWeight: 600 }}>{chip.label}:</Box>{' '}{chip.value}
+                              </Typography>
+                            </Box>
+                            {/* Cycle area — full-height right zone for array-valued chips */}
+                            {chip.cycleNext && (
+                              <Box
+                                onClick={(e) => { e.stopPropagation(); chip.cycleNext!(); }}
+                                sx={{ display: 'flex', alignItems: 'center', px: 1, cursor: 'pointer', bgcolor: 'rgba(0,0,0,0.15)', '&:hover': { bgcolor: 'rgba(0,0,0,0.25)' } }}
+                              >
+                                <NavigateNextIcon sx={{ fontSize: '1.1rem' }} />
+                              </Box>
+                            )}
                           </Box>
-                        )}
+                        </Collapse>
+                      );
+                    })}
+                  </TransitionGroup>
+                </Box>
+              )}
+
+              {/* ── Unselected chips (alphabetical, inline wrap) ─────────── */}
+              {closedChipKeys.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                  {closedChipKeys.map(key => {
+                    const chip = resolveChip(key)!;
+                    return (
+                      <Box
+                        key={key}
+                        onClick={() => toggleContext(key)}
+                        sx={{
+                          display: 'flex', alignItems: 'center', gap: 0.5,
+                          px: 1.5, py: 0.5,
+                          borderRadius: '12px',
+                          border: '1px solid',
+                          borderColor: chip.color,
+                          color: chip.color,
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          transition: 'background-color 0.2s ease, color 0.2s ease',
+                          '&:hover': { bgcolor: chip.color, color: 'common.white' },
+                        }}
+                      >
+                        {chip.icon}
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{chip.label}</Typography>
                       </Box>
-                    )];
+                    );
                   })}
                 </Box>
+              )}
             </>
           )}
 

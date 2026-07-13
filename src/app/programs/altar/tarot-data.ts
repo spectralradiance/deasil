@@ -4,7 +4,6 @@ export interface EnrichedCard {
   // tarot-images.json
   name: string;
   img: string;
-  keywords: string[];
   meanings: { light: string[]; shadow: string[] };
   fortune_telling?: string[];
   Archetype?: string;
@@ -20,9 +19,8 @@ export interface EnrichedCard {
   planet: string | null;
   zodiac: string | null;
   yes_no: 'yes' | 'no' | 'maybe' | null;
+  keywords_upright: string[];
   keywords_reversed: string[];
-  meaning_upright: string | null;
-  meaning_reversed: string | null;
   love: string | null;
   career: string | null;
   mood: string | null;

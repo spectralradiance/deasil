@@ -164,7 +164,7 @@ export default function CardItem({
             color="text.secondary"
             sx={{ display: 'block', mt: 1, textWrap: 'balance' }}
           >
-            {card.keywords.join(', ')}
+            {card.isReversed ? card.keywords_reversed?.join(', ') ?? 'N/A' : card.keywords_upright.join(', ')}
           </Typography>
           <Box sx={{ mt: 0.5, display: 'flex', justifyContent: 'center' }}>
             <IconButton size="small" onClick={() => onInfoClick(card)} aria-label="Card details">
