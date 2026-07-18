@@ -1,36 +1,38 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import Masonry from "@mui/lab/Masonry";
+import { client } from "../sanity-client";
+import imageUrlBuilder from "@sanity/image-url";
+import type { SanityImageSource } from "@sanity/image-url";
 
-const FLICKR_API_KEY = process.env.NEXT_PUBLIC_FLICKR_API_KEY;
-const FLICKR_USER_ID = process.env.NEXT_PUBLIC_FLICKR_USER_ID;
-
-type FlickrAlbum = {
-  id: string;
-  title: {
-    _content: string;
-  };
-  description: {
-    _content: string;
-  };
-  photos: number;
-  primary: string;
-  secret: string;
-  server: string;
-};
+const builder = imageUrlBuilder(client);
+function urlFor(source: SanityImageSource) {
+  return builder.image(source);
+}
 
 type Album = {
-  id: string;
+  _id: string;
   title: string;
-  description: string;
   photoCount: number;
-  coverPhoto: string;
+  coverImage: SanityImageSource | null;
+  coverSourceUrl: string | null;
 };
 
-function buildAlbumCoverUrl(album: FlickrAlbum) {
-  return `https://live.staticflickr.com/${album.server}/${album.primary}_${album.secret}_b.jpg`;
+/** Swap the SmugMug size code in the URL (e.g. /D/file-D.jpg → /L/file-L.jpg) */
+function smugmugResize(url: string, size: string): string {
+  return url.replace(
+    /\/([A-Z][A-Z0-9]*)\/([^/]+)-([A-Z][A-Z0-9]*)(\.[a-zA-Z]+)$/,
+    `/${size}/$2-${size}$4`
+  );
+}
+
+function getCoverUrl(album: Album): string | null {
+  if (album.coverImage) return urlFor(album.coverImage).width(600).url();
+  if (album.coverSourceUrl) return smugmugResize(album.coverSourceUrl, "L");
+  return null;
 }
 
 export default function PhotosPage() {
@@ -40,22 +42,18 @@ export default function PhotosPage() {
   useEffect(() => {
     async function fetchAlbums() {
       try {
-        const url = `https://www.flickr.com/services/rest/?method=flickr.photosets.getList&api_key=${FLICKR_API_KEY}&user_id=${FLICKR_USER_ID}&format=json&nojsoncallback=1&per_page=50`;
-        const res = await fetch(url);
-        const data = await res.json();
-        
-        if (data.photosets && data.photosets.photoset) {
-          const albumList = data.photosets.photoset.map((album: FlickrAlbum) => ({
-            id: album.id,
-            title: album.title._content,
-            description: album.description._content,
-            photoCount: album.photos,
-            coverPhoto: buildAlbumCoverUrl(album),
-          }));
-          setAlbums(albumList);
-        }
+        const data = await client.fetch<Album[]>(`
+          *[_type == "album"] | order(title asc) {
+            _id,
+            title,
+            "photoCount": count(photographs),
+            "coverImage": photographs[0]->image,
+            "coverSourceUrl": photographs[0]->sourceUrl
+          }
+        `);
+        setAlbums(data ?? []);
       } catch (error) {
-        console.error('Error fetching albums:', error);
+        console.error("Error fetching albums:", error);
       } finally {
         setLoading(false);
       }
@@ -75,79 +73,79 @@ export default function PhotosPage() {
   return (
     <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
       <h1>Photo Albums</h1>
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', 
-        gap: '16px',
-        marginTop: '24px'
-      }}>
-        {albums.map((album) => (
-          <Link 
-            key={album.id} 
-            href={`/photos/${album.id}`}
-            style={{ textDecoration: 'none', color: 'inherit' }}
-          >
-            <div style={{
-              position: 'relative',
-              overflow: 'hidden',
-              borderRadius: '8px',
-              transition: 'transform 0.2s, box-shadow 0.2s',
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.02)';
-              e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-            }}>
-              <Image
-                src={album.coverPhoto}
-                alt={album.title}
-                width={800}
-                height={600}
-                style={{ 
-                  width: '100%', 
-                  height: 'auto',
-                  display: 'block'
+      {albums.length === 0 && <p style={{ color: "#888" }}>No albums found.</p>}
+      <Masonry columns={{ xs: 2, sm: 3, md: 4 }} spacing={2} sx={{ mt: 3 }}>
+        {albums.filter((album) => album.photoCount > 0).map((album) => {
+          const coverUrl = getCoverUrl(album);
+          return (
+            <Link
+              key={album._id}
+              href={`/photos/${album._id}`}
+              style={{ textDecoration: "none", color: "inherit", display: "block" }}
+            >
+              <div
+                style={{
+                  position: "relative",
+                  overflow: "hidden",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  background: "#222",
+                  transition: "transform 0.2s, box-shadow 0.2s",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                 }}
-              />
-              <div style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
-                padding: '40px 20px 20px 20px',
-                color: 'white'
-              }}>
-                <h3 style={{ 
-                  margin: 0, 
-                  fontSize: '1.4em', 
-                  fontWeight: 'bold',
-                  textShadow: '2px 2px 4px rgba(0,0,0,0.8)'
-                }}>
-                  {album.title}
-                </h3>
-                <p style={{
-                  margin: '8px 0 0 0',
-                  fontSize: '0.9em',
-                  textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical'
-                }}>
-                  {album.description}
-                </p>
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "scale(1.02)";
+                  e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+                }}
+              >
+                {coverUrl ? (
+                  album.coverImage ? (
+                    <Image
+                      src={coverUrl}
+                      alt={album.title}
+                      width={600}
+                      height={400}
+                      style={{ width: "100%", height: "auto", display: "block" }}
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={coverUrl}
+                      alt={album.title}
+                      loading="lazy"
+                      style={{ width: "100%", height: "auto", display: "block" }}
+                    />
+                  )
+                ) : (
+                  <div style={{ height: 160, background: "#333" }} />
+                )}
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    background: "linear-gradient(transparent, rgba(0,0,0,0.75))",
+                    padding: "32px 12px 12px",
+                    color: "white",
+                  }}
+                >
+                  <div style={{ fontWeight: "bold", fontSize: "0.95em", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
+                    {album.title}
+                  </div>
+                  <div style={{ fontSize: "0.78em", color: "#ccc", marginTop: 2 }}>
+                    {album.photoCount} {album.photoCount === 1 ? "photo" : "photos"}
+                  </div>
+                </div>
               </div>
-            </div>
-          </Link>
-        ))}
-      </div>
+            </Link>
+          );
+        })}
+      </Masonry>
     </main>
   );
 }
