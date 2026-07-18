@@ -214,17 +214,6 @@ export default function CardModal({ modalCard, modalIsReversed, onClose }: CardM
             ))}
           </Box>
 
-          {/* ── Keywords ─────────────────────────────────────────────────── */}
-          {/* Switches to the reversed keyword set when the card is reversed */}
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
-            {(modalIsReversed
-              ? (modalCard.keywords_reversed ?? modalCard.keywords_upright)
-              : modalCard.keywords_upright
-            ).map((kw, i) => (
-              <Chip key={i} label={kw} size="small" sx={{ bgcolor: 'transparent' }} />
-            ))}
-          </Box>
-
           <Divider sx={{ my: 1.5 }} />
 
           {/* ── Waite descriptive content ────────────────────────────────── */}
@@ -353,12 +342,19 @@ export default function CardModal({ modalCard, modalIsReversed, onClose }: CardM
 
           {/* ── Light / Shadow meaning lists ─────────────────────────────── */}
           <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Light Meanings</Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
+            {modalCard.keywords_upright.join(', ')}
+          </Box>
           <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 1.5 }}>
             {modalCard.meanings.light.map((m, i) => (
               <Typography component="li" key={i} variant="body2">{m}</Typography>
             ))}
           </Box>
+
           <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Shadow Meanings</Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
+            {modalCard.keywords_reversed?.join(', ') ?? 'N/A'}
+          </Box>
           <Box component="ul" sx={{ pl: 2, mt: 0.5, mb: 0 }}>
             {modalCard.meanings.shadow.map((m, i) => (
               <Typography component="li" key={i} variant="body2">{m}</Typography>

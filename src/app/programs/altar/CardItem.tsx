@@ -1,6 +1,6 @@
 "use client";
 import Image from 'next/image';
-import { Box, Collapse, Typography, IconButton } from '@mui/material';
+import { Box, Collapse, Typography, IconButton, Chip } from '@mui/material';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import type { CardFlipState, DrawnCard, SpreadPosition } from './tarot-constants';
@@ -159,13 +159,12 @@ export default function CardItem({
             {/* Reversal indicator — only shown for reversed cards */}
             {card.isReversed ? <AutorenewIcon fontSize="inherit" /> : null}
           </Typography>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ display: 'block', mt: 1, textWrap: 'balance' }}
+          <Box sx={{ display: 'block', mt: 1, textWrap: 'balance' }}
           >
-            {card.isReversed ? card.keywords_reversed?.join(', ') ?? 'N/A' : card.keywords_upright.join(', ')}
-          </Typography>
+            {(card.isReversed ? card.keywords_reversed ?? ['N/A'] : card.keywords_upright).map((kw, i) => (
+              <Chip key={i} label={kw.toLowerCase()} size="small" sx={{ bgcolor: 'transparent' }} />
+            ))}
+          </Box>
           <Box sx={{ mt: 0.5, display: 'flex', justifyContent: 'center' }}>
             <IconButton size="small" onClick={() => onInfoClick(card)} aria-label="Card details">
               <InfoOutlinedIcon fontSize="small" />
