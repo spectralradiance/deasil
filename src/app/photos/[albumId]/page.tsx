@@ -208,7 +208,8 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
         open={lightboxIndex >= 0}
         close={() => setLightboxIndex(-1)}
         index={lightboxIndex}
-        plugins={showCaptions ? [Captions] : []}
+        on={{ view: ({ index }) => setLightboxIndex(index) }}
+        plugins={[Captions]}
         toolbar={{
           buttons: [
             <button
@@ -227,27 +228,20 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
         slides={photographs.map((p) => ({
           src: getFullUrl(p),
           alt: p.title,
-          title: showCaptions ? p.title : undefined,
           description: showCaptions ? (
-            <div style={{ padding: "12px 16px", color: "white", fontSize: "0.85em" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
-                <div>
-                  {p.captureDateTime && (
-                    <div style={{ color: "#ccc" }}>
-                      <strong>Captured:</strong><br />
-                      {new Date(p.captureDateTime).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  {p.cameraBody && <div style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><PhotoCamera style={{ fontSize: 15 }} /><span>{p.cameraBody}</span></div>}
-                  {p.cameraLens && <div style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><Lens style={{ fontSize: 15 }} /><span>{p.cameraLens}</span></div>}
-                </div>
-                <div>
-                  {p.aperture && <div style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><Camera style={{ fontSize: 15 }} /><span>{p.aperture}</span></div>}
-                  {p.focalLength && <div style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><Straighten style={{ fontSize: 15 }} /><span>{p.focalLength}mm</span></div>}
-                  {p.shutterSpeed && <div style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><Timer style={{ fontSize: 15 }} /><span>{p.shutterSpeed}</span></div>}
-                </div>
+            <div style={{ padding: "8px 16px", color: "white", fontSize: "0.85em" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: "8px 20px" }}>
+                <span style={{ fontWeight: "bold" }}>{p.title}</span>
+                {p.captureDateTime && (
+                  <span style={{ color: "#ccc", display: "flex", alignItems: "center", gap: 5 }}>
+                    {new Date(p.captureDateTime).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                )}
+                {p.cameraBody && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><PhotoCamera style={{ fontSize: 15 }} />{p.cameraBody}</span>}
+                {p.cameraLens && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Lens style={{ fontSize: 15 }} />{p.cameraLens}</span>}
+                {p.aperture && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Camera style={{ fontSize: 15 }} />{p.aperture}</span>}
+                {p.focalLength && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Straighten style={{ fontSize: 15 }} />{p.focalLength}mm</span>}
+                {p.shutterSpeed && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Timer style={{ fontSize: 15 }} />{p.shutterSpeed}</span>}
               </div>
             </div>
           ) : undefined,

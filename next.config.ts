@@ -6,8 +6,18 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'live.staticflickr.com',
-        port: '',
-        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.sanity.io',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.smugmug.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.rackcdn.com',
       },
     ],
   },

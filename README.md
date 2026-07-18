@@ -18,23 +18,44 @@ show hamburger menu on each page, expand to show icons
 - Able to add or remove?
 - Allow user to download svg
 - Show calendar and play icons - calendar allows the user to set a particular datetime, play sets it to the preset
+
 - Types of calendars
-  - day of the week
-  - moon - current phase, distance, last phase and datetime, next phase and datetime, next eclipse, last eclipse
-  - year - 
-  - astrological placements
+  - day
+    - icons: sunrise, sunset, solar noon, solar midnight
+    - lines: current time of day
+    - colors: blue-orange
+    - text: morning, midday, evening, night
+    - info: twilight, golden hour, blue hour
+  - moon
+    - icons: phases of the moon
+    - lines: current phase of the moon
+    - colors: ?
+    - text: waxing/waning
+    - info: current phase, distance, last phase and datetime, next phase and datetime, next eclipse, last eclipse
+  - wheel of the year
+    - icons: eight sabbaths
+    - lines: current day of the year
+    - colors: rainbow
+    - text: seasons (4), months (12)?
+    - info: ??
+  - astrological year
+    - icons: 12 astrological symbols
+    - lines: sun, moon, planets
+    - colors: mutable/fixed?
+    - text: ?
+    - info: ?
 - important events in history that happened today?
 - ecospiritual reflection?
+- day of the week?
 
 ## Altar
 
-- https://www.kaggle.com/datasets/lsind18/tarot-json
 - allow entering of a prompt, use with reading or seed to random number generator
 - reading - use browser's AI or use google cloud services
 - use quantum random number generator
 - allow runes in addition to tarot
 - Browse cards - all, minor/major, element
-- Include Runes - Eldar Futhark, Younger Futhark, Alglo-Saxon
+- Include Runes - Eldar Futhark, Younger Futhark, Anglo-Saxon
 - Lenormand?
 - Datasets used
   - [Kaggle - Tarot Deck](https://www.kaggle.com/datasets/lsind18/tarot-json/data)
