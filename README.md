@@ -10,6 +10,25 @@ show hamburger menu on each page, expand to show icons
 - table of contents
 
 
+- top-right button humburger menu
+  - (on mobile) main menu (writing, protography, programs)
+  - share (facebook, instagram, copy link)
+  - light/dark mode
+
+## Writing
+
+- floating collapsible table of contents
+
+
+## Photography
+
+- Lightbox
+  - Buy
+  - Share
+  - Toggle metadata
+  - Close
+
+## Programs
 
 ### Sundial
 

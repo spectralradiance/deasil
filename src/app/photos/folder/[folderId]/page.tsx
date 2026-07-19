@@ -1,11 +1,11 @@
-﻿"use client";
+"use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Masonry from "@mui/lab/Masonry";
 import FolderOpen from "@mui/icons-material/FolderOpen";
-import { client } from "../sanity-client";
+import { client } from "../../../sanity-client";
 import imageUrlBuilder from "@sanity/image-url";
 import type { SanityImageSource } from "@sanity/image-url";
 
@@ -19,6 +19,12 @@ type GalleryItem = {
   coverImage: SanityImageSource | null;
   coverSourceUrl: string | null;
   childCount: number | null;
+};
+
+type FolderData = {
+  _id: string;
+  title: string;
+  children: GalleryItem[];
 };
 
 /** Swap the SmugMug size code in the URL (e.g. /D/file-D.jpg → /L/file-L.jpg) */
@@ -35,48 +41,90 @@ function getCoverUrl(item: GalleryItem): string | null {
   return null;
 }
 
-export default function PhotosPage() {
-  const [items, setItems] = useState<GalleryItem[]>([]);
+export default function FolderPage({ params }: { params: Promise<{ folderId: string }> }) {
+  const { folderId } = use(params);
+  const [folder, setFolder] = useState<FolderData | null>(null);
+  const [parentFolder, setParentFolder] = useState<{ _id: string; title: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchItems() {
+    async function fetchData() {
       try {
-        const data = await client.fetch<GalleryItem[]>(`
-          *[_type in ["folder", "album"] && !(_id in *[_type == "folder"].children[]._ref)] | order(title asc) {
-            _id,
-            _type,
-            title,
-            "photoCount": count(photographs),
-            "coverImage": coalesce(photographs[0]->image, children[0]->photographs[0]->image),
-            "coverSourceUrl": coalesce(photographs[0]->sourceUrl, children[0]->photographs[0]->sourceUrl),
-            "childCount": count(children),
-          }
-        `);
-        setItems(data ?? []);
+        const [data, parent] = await Promise.all([
+          client.fetch<FolderData | null>(`
+            *[_type == "folder" && _id == $id][0] {
+              _id,
+              title,
+              "children": children[]->{
+                _id,
+                _type,
+                title,
+                "photoCount": count(photographs),
+                "coverImage": coalesce(photographs[0]->image, children[0]->photographs[0]->image),
+                "coverSourceUrl": coalesce(photographs[0]->sourceUrl, children[0]->photographs[0]->sourceUrl),
+                "childCount": count(children),
+              }
+            }
+          `, { id: folderId }),
+          client.fetch<{ _id: string; title: string } | null>(
+            `*[_type == "folder" && $id in children[]._ref][0] { _id, title }`,
+            { id: folderId }
+          ),
+        ]);
+        setFolder(data ?? null);
+        setParentFolder(parent ?? null);
       } catch (error) {
-        console.error("Error fetching photos:", error);
+        console.error("Error fetching folder data:", error);
       } finally {
         setLoading(false);
       }
     }
-    fetchItems();
-  }, []);
+    fetchData();
+  }, [folderId]);
+
+  const backHref = parentFolder ? `/photos/folder/${parentFolder._id}` : "/photos";
+  const backLabel = parentFolder ? parentFolder.title : "Photos";
 
   if (loading) {
     return (
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
-        <h1>Photos</h1>
-        <p>Loading...</p>
+        <Link href={backHref} style={{ color: "#007ACC", textDecoration: "none", fontSize: "14px", marginBottom: "16px", display: "inline-block" }}>
+          ← Back to {backLabel}
+        </Link>
+        <h1>Loading...</h1>
       </main>
     );
   }
 
+  if (!folder) {
+    return (
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
+        <Link href="/photos" style={{ color: "#007ACC", textDecoration: "none", fontSize: "14px", marginBottom: "16px", display: "inline-block" }}>
+          ← Back to Photos
+        </Link>
+        <p style={{ color: "#888" }}>Folder not found.</p>
+      </main>
+    );
+  }
+
+  const items = folder.children ?? [];
+
   return (
     <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
-      <h1>Photos</h1>
-      {items.length === 0 && <p style={{ color: "#888" }}>No photos found.</p>}
-      <Masonry columns={{ xs: 2, sm: 3, md: 4 }} spacing={2} sx={{ mt: 3 }}>
+      <Link href={backHref} style={{ color: "#007ACC", textDecoration: "none", fontSize: "14px", marginBottom: "16px", display: "inline-block" }}>
+        ← Back to {backLabel}
+      </Link>
+
+      <div style={{ marginBottom: "24px" }}>
+        <h1 style={{ margin: "0 0 4px 0" }}>{folder.title}</h1>
+        <p style={{ color: "#888", fontSize: "14px", margin: 0 }}>
+          {items.length} {items.length === 1 ? "item" : "items"}
+        </p>
+      </div>
+
+      {items.length === 0 && <p style={{ color: "#888" }}>No items in this folder.</p>}
+
+      <Masonry columns={{ xs: 2, sm: 3, md: 4 }} spacing={2} sx={{ mt: 1 }}>
         {items.map((item) => {
           const coverUrl = getCoverUrl(item);
           const href = item._type === "folder" ? `/photos/folder/${item._id}` : `/photos/${item._id}`;

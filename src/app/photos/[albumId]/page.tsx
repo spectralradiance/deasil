@@ -6,8 +6,6 @@ import Image from "next/image";
 import Masonry from "@mui/lab/Masonry";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
-import { Captions } from "yet-another-react-lightbox/plugins";
-import "yet-another-react-lightbox/plugins/captions.css";
 import {
   Visibility,
   VisibilityOff,
@@ -17,6 +15,7 @@ import {
   PhotoCamera,
   Lens,
   Info,
+  InsertLink,
 } from "@mui/icons-material";
 import { client } from "../../sanity-client";
 import imageUrlBuilder from "@sanity/image-url";
@@ -74,6 +73,7 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
   const [lightboxIndex, setLightboxIndex] = useState(-1);
   const [loading, setLoading] = useState(true);
   const [showCaptions, setShowCaptions] = useState(true);
+  const [parentFolder, setParentFolder] = useState<{ _id: string; title: string } | null>(null);
 
   useEffect(() => {
     async function fetchAlbumData() {
@@ -102,6 +102,11 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
           setAlbumInfo(data);
           setPhotographs(data.photographs ?? []);
         }
+        const parent = await client.fetch<{ _id: string; title: string } | null>(
+          `*[_type == "folder" && $id in children[]._ref][0] { _id, title }`,
+          { id: albumId }
+        );
+        setParentFolder(parent ?? null);
       } catch (error) {
         console.error("Error fetching album data:", error);
       } finally {
@@ -116,7 +121,7 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
     return (
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
         <Link href="/photos" style={{ color: "#007ACC", textDecoration: "none", fontSize: "14px", marginBottom: "16px", display: "inline-block" }}>
-          ← Back to Albums
+          ← Back to Photos
         </Link>
         <h1>Loading...</h1>
       </main>
@@ -125,8 +130,8 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
 
   return (
     <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
-      <Link href="/photos" style={{ color: "#007ACC", textDecoration: "none", fontSize: "14px", marginBottom: "16px", display: "inline-block" }}>
-        ← Back to Albums
+      <Link href={parentFolder ? `/photos/folder/${parentFolder._id}` : "/photos"} style={{ color: "#007ACC", textDecoration: "none", fontSize: "14px", marginBottom: "16px", display: "inline-block" }}>
+        ← Back to {parentFolder ? parentFolder.title : "Photos"}
       </Link>
 
       {albumInfo && (
@@ -209,9 +214,21 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
         close={() => setLightboxIndex(-1)}
         index={lightboxIndex}
         on={{ view: ({ index }) => setLightboxIndex(index) }}
-        plugins={[Captions]}
         toolbar={{
           buttons: [
+            <button
+              key="copy-link"
+              type="button"
+              title="Copy link to photo"
+              className="yarl__button"
+              onClick={() => {
+                const photo = photographs[lightboxIndex];
+                if (photo) navigator.clipboard.writeText(`${window.location.origin}/photos/${albumId}/${photo._id}`);
+              }}
+              style={{ background: "none", border: "none", color: "white", cursor: "pointer", padding: "8px", display: "flex", alignItems: "center" }}
+            >
+              <InsertLink style={{ fontSize: 24 }} />
+            </button>,
             <button
               key="toggle-captions"
               type="button"
@@ -225,26 +242,52 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
             "close",
           ],
         }}
+        render={{
+          slide: ({ slide }) => {
+            const p = photographs.find((ph) => getFullUrl(ph) === (slide as { src?: string }).src);
+            return (
+              <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%" }}>
+                {showCaptions && p && (
+                  <div style={{
+                    flexShrink: 0,
+                    background: "rgba(0,0,0,0.6)",
+                    borderBottom: "1px solid rgba(255,255,255,0.1)",
+                    padding: "8px 16px",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: "8px 20px",
+                    color: "white",
+                    fontSize: "0.85em",
+                  }}>
+                    <span style={{ fontWeight: "bold" }}>{p.title}</span>
+                    {p.captureDateTime && (
+                      <span style={{ color: "#ccc", display: "flex", alignItems: "center", gap: 5 }}>
+                        {new Date(p.captureDateTime).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
+                    {p.cameraBody && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><PhotoCamera style={{ fontSize: 15 }} />{p.cameraBody}</span>}
+                    {p.cameraLens && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Lens style={{ fontSize: 15 }} />{p.cameraLens}</span>}
+                    {p.aperture && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Camera style={{ fontSize: 15 }} />{p.aperture}</span>}
+                    {p.focalLength && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Straighten style={{ fontSize: 15 }} />{p.focalLength}mm</span>}
+                    {p.shutterSpeed && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Timer style={{ fontSize: 15 }} />{p.shutterSpeed}</span>}
+                  </div>
+                )}
+                <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={(slide as { src?: string }).src ?? ""}
+                    alt={typeof slide.alt === "string" ? slide.alt : ""}
+                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                  />
+                </div>
+              </div>
+            );
+          },
+        }}
         slides={photographs.map((p) => ({
           src: getFullUrl(p),
           alt: p.title,
-          description: showCaptions ? (
-            <div style={{ padding: "8px 16px", color: "white", fontSize: "0.85em" }}>
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: "8px 20px" }}>
-                <span style={{ fontWeight: "bold" }}>{p.title}</span>
-                {p.captureDateTime && (
-                  <span style={{ color: "#ccc", display: "flex", alignItems: "center", gap: 5 }}>
-                    {new Date(p.captureDateTime).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                )}
-                {p.cameraBody && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><PhotoCamera style={{ fontSize: 15 }} />{p.cameraBody}</span>}
-                {p.cameraLens && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Lens style={{ fontSize: 15 }} />{p.cameraLens}</span>}
-                {p.aperture && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Camera style={{ fontSize: 15 }} />{p.aperture}</span>}
-                {p.focalLength && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Straighten style={{ fontSize: 15 }} />{p.focalLength}mm</span>}
-                {p.shutterSpeed && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Timer style={{ fontSize: 15 }} />{p.shutterSpeed}</span>}
-              </div>
-            </div>
-          ) : undefined,
         }))}
       />
     </main>
