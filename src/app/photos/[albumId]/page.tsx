@@ -16,7 +16,9 @@ import {
   Lens,
   Info,
   InsertLink,
+  ShoppingCart,
 } from "@mui/icons-material";
+import Snackbar from "@mui/material/Snackbar";
 import { client } from "../../sanity-client";
 import imageUrlBuilder from "@sanity/image-url";
 import type { SanityImageSource } from "@sanity/image-url";
@@ -54,6 +56,13 @@ function smugmugResize(url: string, size: string): string {
   );
 }
 
+function getSmugmugBuyUrl(sourceUrl: string | null): string | null {
+  if (!sourceUrl) return null;
+  const match = sourceUrl.match(/smugmug\.com((?:\/[^/]+)*\/i-[A-Za-z0-9]+)/);
+  if (!match) return null;
+  return `https://deasil.smugmug.com${match[1]}/buy`;
+}
+
 function getThumbnailUrl(photo: Photograph): string {
   if (photo.image) return urlFor(photo.image, 600);
   if (photo.sourceUrl) return smugmugResize(photo.sourceUrl, "L");
@@ -74,6 +83,7 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
   const [loading, setLoading] = useState(true);
   const [showCaptions, setShowCaptions] = useState(true);
   const [parentFolder, setParentFolder] = useState<{ _id: string; title: string } | null>(null);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   useEffect(() => {
     async function fetchAlbumData() {
@@ -223,11 +233,28 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
               className="yarl__button"
               onClick={() => {
                 const photo = photographs[lightboxIndex];
-                if (photo) navigator.clipboard.writeText(`${window.location.origin}/photos/${albumId}/${photo._id}`);
+                if (photo) {
+                  navigator.clipboard.writeText(`${window.location.origin}/photos/${albumId}/${photo._id}`);
+                  setSnackbarOpen(true);
+                }
               }}
               style={{ background: "none", border: "none", color: "white", cursor: "pointer", padding: "8px", display: "flex", alignItems: "center" }}
             >
               <InsertLink style={{ fontSize: 24 }} />
+            </button>,
+            <button
+              key="buy"
+              type="button"
+              title="Buy print on SmugMug"
+              className="yarl__button"
+              onClick={() => {
+                const photo = photographs[lightboxIndex];
+                const buyUrl = photo ? getSmugmugBuyUrl(photo.sourceUrl) : null;
+                if (buyUrl) window.open(buyUrl, "_blank", "noopener,noreferrer");
+              }}
+              style={{ background: "none", border: "none", color: "white", cursor: "pointer", padding: "8px", display: "flex", alignItems: "center" }}
+            >
+              <ShoppingCart style={{ fontSize: 24 }} />
             </button>,
             <button
               key="toggle-captions"
@@ -289,6 +316,13 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
           src: getFullUrl(p),
           alt: p.title,
         }))}
+      />
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={2500}
+        onClose={() => setSnackbarOpen(false)}
+        message="Link copied to clipboard"
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       />
     </main>
   );
