@@ -3,15 +3,15 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import Masonry from "@mui/lab/Masonry";
-import FolderOpen from "@mui/icons-material/FolderOpen";
 import { client } from "../sanity-client";
 import imageUrlBuilder from "@sanity/image-url";
 import type { SanityImageSource } from "@sanity/image-url";
 
 const builder = imageUrlBuilder(client);
 
-type GalleryItem = {
+const FOLDER_ORDER = ["Animals", "Plants & Fungi", "Environment"];
+
+type AlbumItem = {
   _id: string;
   _type: "folder" | "album";
   title: string;
@@ -19,6 +19,12 @@ type GalleryItem = {
   coverImage: SanityImageSource | null;
   coverSourceUrl: string | null;
   childCount: number | null;
+};
+
+type FolderSection = {
+  _id: string;
+  title: string;
+  children: AlbumItem[];
 };
 
 /** Swap the SmugMug size code in the URL (e.g. /D/file-D.jpg → /L/file-L.jpg) */
@@ -29,31 +35,38 @@ function smugmugResize(url: string, size: string): string {
   );
 }
 
-function getCoverUrl(item: GalleryItem): string | null {
+function getCoverUrl(item: AlbumItem): string | null {
   if (item.coverImage) return builder.image(item.coverImage).width(600).url();
   if (item.coverSourceUrl) return smugmugResize(item.coverSourceUrl, "L");
   return null;
 }
 
 export default function PhotosPage() {
-  const [items, setItems] = useState<GalleryItem[]>([]);
+  const [folders, setFolders] = useState<FolderSection[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchItems() {
       try {
-        const data = await client.fetch<GalleryItem[]>(`
-          *[_type in ["folder", "album"] && !(_id in *[_type == "folder"].children[]._ref)] | order(title asc) {
+        const data = await client.fetch<FolderSection[]>(`
+          *[_type == "folder" && title in ["Animals", "Plants & Fungi", "Environment"]] {
             _id,
-            _type,
             title,
-            "photoCount": count(photographs),
-            "coverImage": coalesce(photographs[0]->image, children[0]->photographs[0]->image),
-            "coverSourceUrl": coalesce(photographs[0]->sourceUrl, children[0]->photographs[0]->sourceUrl),
-            "childCount": count(children),
+            "children": children[]->{
+              _id,
+              _type,
+              title,
+              "photoCount": count(photographs),
+              "coverImage": coalesce(photographs[0]->image, children[0]->photographs[0]->image),
+              "coverSourceUrl": coalesce(photographs[0]->sourceUrl, children[0]->photographs[0]->sourceUrl),
+              "childCount": count(children),
+            }
           }
         `);
-        setItems(data ?? []);
+        const sorted = (data ?? []).sort(
+          (a, b) => FOLDER_ORDER.indexOf(a.title) - FOLDER_ORDER.indexOf(b.title)
+        );
+        setFolders(sorted);
       } catch (error) {
         console.error("Error fetching photos:", error);
       } finally {
@@ -75,81 +88,77 @@ export default function PhotosPage() {
   return (
     <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
       <h1>Photos</h1>
-      {items.length === 0 && <p style={{ color: "#888" }}>No photos found.</p>}
-      <Masonry columns={{ xs: 2, sm: 3, md: 4 }} spacing={2} sx={{ mt: 3 }}>
-        {items.map((item) => {
-          const coverUrl = getCoverUrl(item);
-          const href = item._type === "folder" ? `/photos/folder/${item._id}` : `/photos/${item._id}`;
-          const subtitle = item._type === "folder"
-            ? `${item.childCount ?? 0} ${item.childCount === 1 ? "item" : "items"}`
-            : `${item.photoCount ?? 0} ${item.photoCount === 1 ? "photo" : "photos"}`;
-          return (
-            <Link key={item._id} href={href} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
-              <div
-                style={{
-                  position: "relative",
-                  overflow: "hidden",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  background: "#222",
-                  transition: "transform 0.2s, box-shadow 0.2s",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "scale(1.02)";
-                  e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "scale(1)";
-                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
-                }}
-              >
-                {coverUrl ? (
-                  item.coverImage ? (
-                    <Image
-                      src={coverUrl}
-                      alt={item.title}
-                      width={600}
-                      height={400}
-                      style={{ width: "100%", height: "auto", display: "block" }}
-                    />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={coverUrl}
-                      alt={item.title}
-                      loading="lazy"
-                      style={{ width: "100%", height: "auto", display: "block" }}
-                    />
-                  )
-                ) : (
-                  <div style={{ height: 160, background: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {item._type === "folder" && <FolderOpen style={{ fontSize: 48, color: "#666" }} />}
+      {folders.map((folder) => (
+        <section key={folder._id} style={{ marginTop: 40 }}>
+          <h2 style={{ marginBottom: 16 }}>{folder.title}</h2>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+              gap: 16,
+            }}
+          >
+            {folder.children?.map((item) => {
+              const coverUrl = getCoverUrl(item);
+              const href = item._type === "folder"
+                ? `/photos/folder/${item._id}`
+                : `/photos/${item._id}`;
+              return (
+                <Link key={item._id} href={href} style={{ textDecoration: "none", color: "inherit" }}>
+                  <div
+                    style={{
+                      cursor: "pointer",
+                      transition: "transform 0.2s, box-shadow 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "scale(1.03)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "relative",
+                        width: "100%",
+                        aspectRatio: "1 / 1",
+                        overflow: "hidden",
+                        borderRadius: 8,
+                        background: "#222",
+                      }}
+                    >
+                      {coverUrl ? (
+                        item.coverImage ? (
+                          <Image
+                            src={coverUrl}
+                            alt={item.title}
+                            fill
+                            sizes="(max-width: 600px) 50vw, (max-width: 900px) 33vw, 20vw"
+                            style={{ objectFit: "cover" }}
+                          />
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={coverUrl}
+                            alt={item.title}
+                            loading="lazy"
+                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          />
+                        )
+                      ) : (
+                        <div style={{ width: "100%", height: "100%", background: "#333" }} />
+                      )}
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: "0.9em", fontWeight: 500, textAlign: "center" }}>
+                      {item.title}
+                    </div>
                   </div>
-                )}
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    background: "linear-gradient(transparent, rgba(0,0,0,0.75))",
-                    padding: "32px 12px 12px",
-                    color: "white",
-                  }}
-                >
-                  <div style={{ fontWeight: "bold", fontSize: "0.95em", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
-                    {item.title}
-                  </div>
-                  <div style={{ fontSize: "0.78em", color: "#ccc", marginTop: 2 }}>
-                    {subtitle}
-                  </div>
-                </div>
-              </div>
-            </Link>
-          );
-        })}
-      </Masonry>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </main>
   );
 }

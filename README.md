@@ -24,7 +24,7 @@ show hamburger menu on each page, expand to show icons
 
 - Lightbox
   - Buy
-  - Share
+  - Share - copy link
   - Toggle metadata
   - Close
 
@@ -67,33 +67,33 @@ show hamburger menu on each page, expand to show icons
 - ecospiritual reflection?
 - day of the week?
 
-## Altar
+### Altar
+
+#### Features
+
+- Tarot cards and spreads
+
+#### Todo
 
 - allow entering of a prompt, use with reading or seed to random number generator
-- reading - use browser's AI or use google cloud services
 - use quantum random number generator
-- allow runes in addition to tarot
-- Browse cards - all, minor/major, element
-- Include Runes - Eldar Futhark, Younger Futhark, Anglo-Saxon
-- Lenormand?
-- Datasets used
-  - [Kaggle - Tarot Deck](https://www.kaggle.com/datasets/lsind18/tarot-json/data)
-  - [Kaggle - Tarotoo Tarot Card Meanings](https://www.kaggle.com/datasets/tarotoo/tarotoo-tarot-card-meanings)
-  - Not used: [Kaggle - Complete Tarot Card Meanings](https://www.kaggle.com/datasets/morrispoint/complete-tarot-card-meanings-all-78-cards), scraped from [here?](https://deckaura.com/blogs/guide/fool-tarot-meaning)
-- Playing cards - use tarot correspondances
-- If card is reversed: 
-
-## Wiki
-
-- spiritual ecology, animism, pantheism
-- figures and books
-  - Robin Wall Kimmerer, Thomas Berry, Joanna Macy, Thich Nhat Hanh, Arne Næss
-- pantheon, different gods/spirits, domains, relationships
+- reading - use browser's AI or use google cloud services
+- card types
+  - Runes - Eldar Futhark, Younger Futhark, Anglo-Saxon
+  - Lenormand?
+  - Playing cards - use tarot correspondances
+- browse cards - all, minor/major, element
+- info box
+  - Datasets used
+    - [Kaggle - Tarot Deck](https://www.kaggle.com/datasets/lsind18/tarot-json/data)
+    - [Kaggle - Tarotoo Tarot Card Meanings](https://www.kaggle.com/datasets/tarotoo/tarotoo-tarot-card-meanings)
+    - Not used: [Kaggle - Complete Tarot Card Meanings](https://www.kaggle.com/datasets/morrispoint/complete-tarot-card-meanings-all-78-cards), scraped from [here?](https://deckaura.com/blogs/guide/fool-tarot-meaning)
 
 
-## Glyph
 
-Glyph in an app to work with ancient character sets, translating from English
+### Glyph
+
+Very little historiocity. Glyph in an app to work with ancient character sets, translating from English
 
 - Included character sets
   - Greek - upper and lowercase
@@ -104,9 +104,3 @@ Glyph in an app to work with ancient character sets, translating from English
   - Ogham - Cernunnos
   - Greek - Chaos (χάος), Odysseus
   - Not only Gods but words for "river", "earth", "time"
-
-## Library
-
-- Translations of different sacred texts
-- https://sacred-texts.com/neu/poe/poe03.htm
-- Old norse pronounciation key

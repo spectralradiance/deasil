@@ -33,6 +33,8 @@ type Photograph = {
   title: string;
   image: SanityImageSource | null;
   sourceUrl: string | null;
+  width: number | null;
+  height: number | null;
   dimensions: { width: number; height: number } | null;
   shutterSpeed?: string;
   aperture?: string;
@@ -97,6 +99,8 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
               title,
               image { ..., asset-> { url, metadata { dimensions } } },
               sourceUrl,
+              width,
+              height,
               "dimensions": image.asset->metadata.dimensions,
               shutterSpeed,
               aperture,
@@ -153,6 +157,13 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
         </div>
       )}
 
+      <style>{`
+        @keyframes photoFadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
       {photographs.length > 0 ? (
         <Masonry columns={{ xs: 2, sm: 3, md: 4, lg: 5 }} spacing={1}>
           {photographs.map((photo, i) => {
@@ -160,26 +171,39 @@ export default function AlbumPage({ params }: { params: Promise<{ albumId: strin
             return (
               <div
                 key={photo._id}
-                style={{ position: "relative", cursor: "pointer", borderRadius: "4px", overflow: "hidden" }}
+                style={{
+                  position: "relative",
+                  cursor: "pointer",
+                  borderRadius: "4px",
+                  overflow: "hidden",
+                  animation: "photoFadeIn 0.3s ease both",
+                  animationDelay: `${i * 50}ms`,
+                }}
                 onClick={() => setLightboxIndex(i)}
               >
-                {photo.image ? (
-                  <Image
-                    src={thumb}
-                    alt={photo.title ?? ""}
-                    width={photo.dimensions?.width ?? 600}
-                    height={photo.dimensions?.height ?? 400}
-                    style={{ width: "100%", height: "auto", display: "block" }}
-                  />
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={thumb}
-                    alt={photo.title ?? ""}
-                    loading="lazy"
-                    style={{ width: "100%", height: "auto", display: "block" }}
-                  />
-                )}
+                {(() => {
+                  const w = photo.width ?? photo.dimensions?.width ?? 3;
+                  const h = photo.height ?? photo.dimensions?.height ?? 2;
+                  return photo.image ? (
+                    <Image
+                      src={thumb}
+                      alt={photo.title ?? ""}
+                      width={w}
+                      height={h}
+                      style={{ width: "100%", height: "auto", display: "block" }}
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={thumb}
+                      alt={photo.title ?? ""}
+                      width={w}
+                      height={h}
+                      loading="lazy"
+                      style={{ width: "100%", height: "auto", display: "block" }}
+                    />
+                  );
+                })()}
                 <div
                   className="photo-overlay"
                   style={{
