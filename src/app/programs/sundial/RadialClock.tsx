@@ -88,6 +88,13 @@ export interface RadialClockProps {
   /** Extra radial distance from ring edge to icon centers; default 28 */
   iconOffset?: number;
 
+  /** Radius of the inner filled circle shown at the center of the clock face.
+   *  Set to 0 (default) for no inner circle.
+   *  When > 0, sector arc text is placed at the midpoint between this circle
+   *  and the ring inner edge rather than just inside the ring.
+   */
+  innerCircleRadius?: number;
+
   /** Children rendered inside the SVG (e.g. custom moon phase overlay) */
   children?: React.ReactNode;
 
@@ -164,6 +171,7 @@ export const RadialClock: React.FC<RadialClockProps> = ({
   ringRadius = 70,
   ringWidth = 8,
   iconOffset = 28,
+  innerCircleRadius = 0,
   children,
   idPrefix = 'rc',
 }) => {
@@ -172,6 +180,12 @@ export const RadialClock: React.FC<RadialClockProps> = ({
   const R = ringRadius;
   const innerR = R - ringWidth / 2;
   const outerR = R + ringWidth / 2;
+
+  // Sector arc text traces just outside the inner circle when one is present,
+  // otherwise sits near the ring inner edge.
+  const sectorTextR = innerCircleRadius > 0
+    ? innerCircleRadius + 4
+    : innerR - 10;
 
   // Number of gradient arc segments to draw (one per adjacent stop pair)
   const nSegments = colorStops.length;
@@ -224,7 +238,7 @@ export const RadialClock: React.FC<RadialClockProps> = ({
         {sectors.map(sec => {
           const a0 = posToRad(sec.startPos, startAngleOffset);
           const a1 = posToRad(sec.endPos, startAngleOffset);
-          const textR = R - ringWidth / 2 - 10;
+          const textR = sectorTextR;
           return (
             <path
               key={`${idPrefix}-sector-path-${sec.label}`}
@@ -235,6 +249,18 @@ export const RadialClock: React.FC<RadialClockProps> = ({
           );
         })}
       </defs>
+
+      {/* ── Inner circle (clock face center) — tinted with the hand's current color ── */}
+      {innerCircleRadius > 0 && (
+        <circle
+          cx={cx} cy={cy} r={innerCircleRadius}
+          fill={handColor}
+          fillOpacity={0.2}
+          stroke={handColor}
+          strokeOpacity={0.55}
+          strokeWidth={1}
+        />
+      )}
 
       {/* ── Sector fills ── */}
       {sectors.map(sec => {
@@ -353,8 +379,8 @@ export const RadialClock: React.FC<RadialClockProps> = ({
             <line
               x1={cx + lineStart * Math.cos(a)} y1={cy + lineStart * Math.sin(a)}
               x2={cx + lineEnd   * Math.cos(a)} y2={cy + lineEnd   * Math.sin(a)}
-              stroke={ic.color ?? 'currentColor'}
-              strokeWidth={1}
+              stroke={ic.color ?? 'transparent'}
+              strokeWidth={2}
               opacity={0.6}
             />
             <image

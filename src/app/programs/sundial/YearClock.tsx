@@ -17,15 +17,15 @@ import RadialClock, { ColorStop, RingIcon, RingLabel, RingSector } from './Radia
 
 /** Order on the wheel starting at the right (0° = Samhain = Nov 1),
  *  going clockwise through the year. */
-const SABBATS: { name: string; shortName: string; icon: string }[] = [
-  { name: 'Samhain',    shortName: 'Samhain',  icon: '/sundial/year/samhain.svg'  },
-  { name: 'Yule',       shortName: 'Yule',     icon: '/sundial/year/yule.svg'     },
-  { name: 'Imbolc',     shortName: 'Imbolc',   icon: '/sundial/year/imbolc.svg'   },
-  { name: 'Ostara',     shortName: 'Ostara',   icon: '/sundial/year/ostara.svg'   },
-  { name: 'Beltane',    shortName: 'Beltane',  icon: '/sundial/year/beltain.svg'  },
-  { name: 'Litha',      shortName: 'Litha',    icon: '/sundial/year/litha.svg'    },
-  { name: 'Lughnasadh', shortName: 'Lughnasa', icon: '/sundial/year/lunasa.svg'   },
-  { name: 'Mabon',      shortName: 'Mabon',    icon: '/sundial/year/mabon.svg'    },
+const SABBATS: { name: string; shortName: string; icon: string; dateLabel: string }[] = [
+  { name: 'Samhain',    shortName: 'Samhain',  icon: '/sundial/year/samhain.svg',  dateLabel: '11/1'  },
+  { name: 'Yule',       shortName: 'Yule',     icon: '/sundial/year/yule.svg',     dateLabel: '12/21' },
+  { name: 'Imbolc',     shortName: 'Imbolc',   icon: '/sundial/year/imbolc.svg',   dateLabel: '2/2'   },
+  { name: 'Ostara',     shortName: 'Ostara',   icon: '/sundial/year/ostara.svg',   dateLabel: '3/20'  },
+  { name: 'Beltane',    shortName: 'Beltane',  icon: '/sundial/year/beltain.svg',  dateLabel: '5/1'   },
+  { name: 'Litha',      shortName: 'Litha',    icon: '/sundial/year/litha.svg',    dateLabel: '6/21'  },
+  { name: 'Lughnasadh', shortName: 'Lughnasa', icon: '/sundial/year/lunasa.svg',   dateLabel: '8/1'   },
+  { name: 'Mabon',      shortName: 'Mabon',    icon: '/sundial/year/mabon.svg',    dateLabel: '9/22'  },
 ];
 
 // ---- Seasonal color palette ---------------------------------
@@ -55,16 +55,16 @@ const YEAR_SECTORS: RingSector[] = [
 ];
 
 // ---- Labels -------------------------------------------------
-// Short sabbat names shown as text at each major position.
+// Month/day date labels shown just inside the ring at each sabbat position.
 const YEAR_LABELS: RingLabel[] = SABBATS.map((sab, i) => ({
   pos: i / SABBATS.length,
-  text: sab.shortName,
+  text: sab.dateLabel,
 }));
 
 // ---- Tick marks ---------------------------------------------
-// 52 minor ticks (one per week), major at each sabbat (every ~6.5 weeks)
-const YEAR_TICKS = 52;
-const YEAR_MAJOR_TICKS = SABBATS.map((_, i) => Math.round((i / SABBATS.length) * YEAR_TICKS));
+// 40 ticks = 8 sabbats × 5, so major ticks at [0,5,10,...] land exactly on icon positions.
+const YEAR_TICKS = 40;
+const YEAR_MAJOR_TICKS = [0, 5, 10, 15, 20, 25, 30, 35];
 
 // ---- Hand position ------------------------------------------
 // Converts today's date to a 0–1 fraction of the pagan year.
@@ -117,6 +117,7 @@ export const YearClock: React.FC<YearClockProps> = ({ date }) => {
       ringRadius={100}
       ringWidth={12}
       iconOffset={28}
+      innerCircleRadius={33}
       idPrefix="year"
     />
   );

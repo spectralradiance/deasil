@@ -130,6 +130,7 @@ export const DailyClock: React.FC<DailyClockProps> = ({ date, sunrise, sunset })
       ringRadius={72}
       ringWidth={8}
       iconOffset={30}
+      innerCircleRadius={24}
       idPrefix="daily"
     />
   );

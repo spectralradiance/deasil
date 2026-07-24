@@ -28,26 +28,25 @@ const MOON_COLORS: ColorStop[] = [
 // 8 phases, evenly spaced around the ring; pos=0 = new moon (bottom of clock).
 // Icons go counterclockwise on screen so waxing is on the left.
 const PHASE_ICONS: RingIcon[] = [
-  { pos: 0,     href: '/sundial/moon/new_moon.svg',        label: 'New'      },
-  { pos: 0.125, href: '/sundial/moon/waxing_crescent.svg', label: 'Crescent' },
-  { pos: 0.25,  href: '/sundial/moon/first_quarter.svg',   label: '1st Qtr'  },
-  { pos: 0.375, href: '/sundial/moon/waxing_gibbous.svg',  label: 'Gibbous'  },
-  { pos: 0.5,   href: '/sundial/moon/full_moon.svg',       label: 'Full'     },
-  { pos: 0.625, href: '/sundial/moon/waning_gibbous.svg',  label: 'Gibbous'  },
-  { pos: 0.75,  href: '/sundial/moon/last_quarter.svg',    label: '3rd Qtr'  },
-  { pos: 0.875, href: '/sundial/moon/waning_crescent.svg', label: 'Crescent' },
+  { pos: 0,     href: '/sundial/moon/new_moon.svg'        },
+  { pos: 0.125, href: '/sundial/moon/waxing_crescent.svg' },
+  { pos: 0.25,  href: '/sundial/moon/first_quarter.svg'   },
+  { pos: 0.375, href: '/sundial/moon/waxing_gibbous.svg'  },
+  { pos: 0.5,   href: '/sundial/moon/full_moon.svg'       },
+  { pos: 0.625, href: '/sundial/moon/waning_gibbous.svg'  },
+  { pos: 0.75,  href: '/sundial/moon/last_quarter.svg'    },
+  { pos: 0.875, href: '/sundial/moon/waning_crescent.svg' },
 ];
 
 // ---- Tick marks & labels ------------------------------------
+// 32 ticks = 8 phases × 4, so major ticks at [0,4,8,...] land exactly on icon positions.
+const MOON_TICKS = 32;
+const MOON_MAJOR_TICKS = [0, 4, 8, 12, 16, 20, 24, 28];
 
-// 30 minor ticks (roughly one per day), major at each of the 8 phases
-const MOON_TICKS = 30;
-const MOON_MAJOR_TICKS = [0, 4, 8, 11, 15, 19, 23, 26]; // approx phase indices in 30
-
-// Day-of-cycle labels at the 8 major phase positions
+// Day-of-cycle labels at the 8 major phase positions (one decimal place)
 const MOON_LABELS: RingLabel[] = PHASE_ICONS.map(ic => ({
   pos: ic.pos,
-  text: ((ic.pos * SYNODIC_MONTH)).toFixed(0) + 'd',
+  text: (ic.pos * SYNODIC_MONTH).toFixed(1) + 'd',
 }));
 
 // ---- Sectors ------------------------------------------------
@@ -109,12 +108,6 @@ interface MoonClockProps {
 export const MoonClock: React.FC<MoonClockProps> = ({ percent }) => {
   const theme = useTheme();
 
-  // Invert icon colors so they are always visible: white-on-dark for dark mode,
-  // black-on-light for light mode.
-  const iconFilter = theme.palette.mode === 'dark'
-    ? 'brightness(0) invert(1)'
-    : 'brightness(0)';
-
   // Pass a CSS filter string so RadialClock can apply it directly to each <image>.
   // This inverts the icons to white in dark mode and renders them black in light mode.
   const iconFilterStyle = theme.palette.mode === 'dark'
@@ -127,7 +120,8 @@ export const MoonClock: React.FC<MoonClockProps> = ({ percent }) => {
   const size     = 200;
   const cx       = size / 2;
   const cy       = size / 2;
-  const discR    = 44; // radius of the inner moon disc
+  // 33% of the ring radius (72) — matches the inner circle proportion of other clocks
+  const discR    = Math.round(72 * 0.33); // ~24
 
   return (
     <RadialClock
@@ -144,6 +138,7 @@ export const MoonClock: React.FC<MoonClockProps> = ({ percent }) => {
       ringRadius={72}
       ringWidth={8}
       iconOffset={30}
+      innerCircleRadius={discR}
       idPrefix="moon"
     >
       {/* Moon phase disc rendered in the center of the clock */}
