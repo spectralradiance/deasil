@@ -36,6 +36,16 @@ function formatTime(date: Date) {
   };
 }
 
+// ---- Responsive clock container ----------------------------
+// SVG fills container width and scales proportionally (height: auto).
+// On mobile the container spans full viewport width; on desktop it is
+// capped at 420 px (larger than the clock's natural ~370 px render size).
+const CLOCK_WRAPPER_SX = {
+  width:      { xs: '100%', md: '420px' },
+  flexShrink: 0,
+  '& svg':    { width: '100%', height: 'auto', display: 'block' },
+} as const;
+
 // ---- Page ---------------------------------------------------
 
 export default function SundialPage() {
@@ -120,10 +130,12 @@ export default function SundialPage() {
       </Typography>
 
       {/* ── Daily (solar) clock ── */}
-      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
-        <DailyClock date={time} sunrise={sunTimes.sunrise} sunset={sunTimes.sunset} />
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', gap: 4, width: '100%' }}>
+        <Box sx={CLOCK_WRAPPER_SX}>
+          <DailyClock date={time} sunrise={sunTimes.sunrise} sunset={sunTimes.sunset} />
+        </Box>
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5 }}>Day</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5 }}>Sun</Typography>
           <Typography variant="body2" sx={{ mb: 0.5 }}>{`${year}-${month}-${day}`}</Typography>
           {sunTimes.sunrise && (
             <Typography variant="body2" sx={{ color: '#FFD700' }}>
@@ -144,12 +156,14 @@ export default function SundialPage() {
       </Box>
 
       {/* ── Moon clock ── */}
-      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
-        <MoonClock
-          percent={moonPercent}
-          activeIconIndex={moonDisplayIdx}
-          onIconClick={(i) => setMoonSelectedIdx(prev => prev === i ? null : i)}
-        />
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', gap: 4, width: '100%' }}>
+        <Box sx={CLOCK_WRAPPER_SX}>
+          <MoonClock
+            percent={moonPercent}
+            activeIconIndex={moonDisplayIdx}
+            onIconClick={(i) => setMoonSelectedIdx(prev => prev === i ? null : i)}
+          />
+        </Box>
         <Box sx={{ maxWidth: 220 }}>
           <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5 }}>Moon</Typography>
           <Typography variant="body2">Age: {moonAge.toFixed(1)} days</Typography>
@@ -176,12 +190,14 @@ export default function SundialPage() {
       </Box>
 
       {/* ── Wheel of the Year clock ── */}
-      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
-        <YearClock
-          date={time}
-          activeIconIndex={yearDisplayIdx}
-          onIconClick={(i) => setYearSelectedIdx(prev => prev === i ? null : i)}
-        />
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', gap: 4, width: '100%' }}>
+        <Box sx={CLOCK_WRAPPER_SX}>
+          <YearClock
+            date={time}
+            activeIconIndex={yearDisplayIdx}
+            onIconClick={(i) => setYearSelectedIdx(prev => prev === i ? null : i)}
+          />
+        </Box>
         <Box sx={{ maxWidth: 220 }}>
           <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5 }}>Seasons</Typography>
           {current && (
@@ -219,12 +235,14 @@ export default function SundialPage() {
       </Box>
 
       {/* ── Astrological / zodiac clock ── */}
-      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
-        <AstroClock
-          date={time}
-          activeIconIndex={astroDisplayIdx}
-          onSignClick={(i) => setAstroSelectedIdx(prev => prev === i ? null : i)}
-        />
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', gap: 4, width: '100%' }}>
+        <Box sx={CLOCK_WRAPPER_SX}>
+          <AstroClock
+            date={time}
+            activeIconIndex={astroDisplayIdx}
+            onSignClick={(i) => setAstroSelectedIdx(prev => prev === i ? null : i)}
+          />
+        </Box>
         <Box sx={{ maxWidth: 220 }}>
           <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5 }}>Stars</Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>

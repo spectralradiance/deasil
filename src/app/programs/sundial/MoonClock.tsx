@@ -60,7 +60,7 @@ const MOON_MAJOR_TICKS = [0, 4, 8, 12, 16, 20, 24, 28];
 // Day-of-cycle labels at the 8 major phase positions (one decimal place)
 const MOON_LABELS: RingLabel[] = PHASE_ICONS.map(ic => ({
   pos: ic.pos,
-  text: (ic.pos * SYNODIC_MONTH).toFixed(1) + 'd',
+  text: (ic.pos * SYNODIC_MONTH).toFixed(1),
 }));
 
 // ---- Sectors ------------------------------------------------

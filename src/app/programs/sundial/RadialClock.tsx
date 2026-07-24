@@ -209,6 +209,7 @@ export const RadialClock: React.FC<RadialClockProps> = ({
       width={size + iconOffset * 2 + 30}
       height={size + iconOffset * 2 + 30}
       viewBox={`${-iconOffset - 15} ${-iconOffset - 15} ${size + (iconOffset + 15) * 2} ${size + (iconOffset + 15) * 2}`}
+      style={{ userSelect: 'none', display: 'block' }}
     >
       <defs>
         {/* One linear gradient per color-stop segment */}

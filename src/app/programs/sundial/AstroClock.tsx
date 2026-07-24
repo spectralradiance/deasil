@@ -32,40 +32,45 @@ export const ZODIAC_DATA: ZodiacInfo[] = [
   { name: 'Pisces',       symbol: '♓︎', description: 'Compassionate, dreamy, and spiritual. Season of endings and transcendence.' },
 ];
 
-// ---- Zodiac gradient colors ---------------------------------
-// Colors follow elemental associations cycling through each sign:
-// Fire (Aries/Leo/Sag): warm reds & oranges
-// Earth (Taurus/Virgo/Cap): greens & olives
-// Air (Gemini/Libra/Aqua): golds, violets, sky blues
-// Water (Cancer/Scorpio/Pisces): blues & purples
+// ---- Zodiac gradient colors — element × quality scheme -----
+// Each sign inherits its element's hue at a luminance that reflects its quality:
+//   Cardinal (initiating)  → light shade
+//   Fixed    (stable)      → medium shade
+//   Mutable  (transitional)→ dark shade
+//
+// Sign order:  Aries  Taurus  Gemini   Cancer  Leo     Virgo
+//              Libra  Scorpio Sagittar Capricorn Aquarius Pisces
+// Element:     Fire   Earth   Air      Water   Fire    Earth
+//              Air    Water   Fire     Earth   Air     Water
+// Quality:     Card   Fixed   Mutable  Card    Fixed   Mutable
+//              Card   Fixed   Mutable  Card    Fixed   Mutable
 const ZODIAC_COLORS: ColorStop[] = [
-  { pos:  0 / 12, hex: '#FF4500' }, // Aries        — fire red
-  { pos:  1 / 12, hex: '#228B22' }, // Taurus       — earth green
-  { pos:  2 / 12, hex: '#DAA520' }, // Gemini       — air gold
-  { pos:  3 / 12, hex: '#4169E1' }, // Cancer       — water blue
-  { pos:  4 / 12, hex: '#FF8C00' }, // Leo          — fire orange
-  { pos:  5 / 12, hex: '#8FBC8F' }, // Virgo        — earth sage
-  { pos:  6 / 12, hex: '#9370DB' }, // Libra        — air violet
-  { pos:  7 / 12, hex: '#8B0000' }, // Scorpio      — water deep red
-  { pos:  8 / 12, hex: '#FF6347' }, // Sagittarius  — fire tomato
-  { pos:  9 / 12, hex: '#556B2F' }, // Capricorn    — earth olive
-  { pos: 10 / 12, hex: '#87CEEB' }, // Aquarius     — air sky blue
-  { pos: 11 / 12, hex: '#7B68EE' }, // Pisces       — water medium slate
+  { pos:  0 / 12, hex: '#FF6633' }, // Aries        — Fire   Cardinal (light)
+  { pos:  1 / 12, hex: '#4A7A30' }, // Taurus       — Earth  Fixed    (medium)
+  { pos:  2 / 12, hex: '#7A6000' }, // Gemini       — Air    Mutable  (dark)
+  { pos:  3 / 12, hex: '#88CCEE' }, // Cancer       — Water  Cardinal (light)
+  { pos:  4 / 12, hex: '#CC2211' }, // Leo          — Fire   Fixed    (medium)
+  { pos:  5 / 12, hex: '#3A5A20' }, // Virgo        — Earth  Mutable  (dark)
+  { pos:  6 / 12, hex: '#FFDD44' }, // Libra        — Air    Cardinal (light)
+  { pos:  7 / 12, hex: '#3355CC' }, // Scorpio      — Water  Fixed    (medium)
+  { pos:  8 / 12, hex: '#AA3311' }, // Sagittarius  — Fire   Mutable  (dark)
+  { pos:  9 / 12, hex: '#88BB88' }, // Capricorn    — Earth  Cardinal (light)
+  { pos: 10 / 12, hex: '#AA8800' }, // Aquarius     — Air    Fixed    (medium)
+  { pos: 11 / 12, hex: '#2233AA' }, // Pisces       — Water  Mutable  (dark)
 ];
 
-// ---- Planet display data ------------------------------------
-// lengthFraction: how far the hand reaches relative to the Sun hand length
-const PLANETS: {
-  key: string; symbol: string; color: string; lengthFraction: number; strokeWidth: number
-}[] = [
-  { key: 'Moon',    symbol: '\u263D\uFE0E', color: '#C0C0C0', lengthFraction: 0.80, strokeWidth: 1.5 },
-  { key: 'Mercury', symbol: '\u263F\uFE0E', color: '#B8860B', lengthFraction: 0.65, strokeWidth: 1.0 },
-  { key: 'Venus',   symbol: '\u2640\uFE0E', color: '#FFB6C1', lengthFraction: 0.70, strokeWidth: 1.5 },
-  { key: 'Mars',    symbol: '\u2642\uFE0E', color: '#FF4500', lengthFraction: 0.72, strokeWidth: 1.5 },
-  { key: 'Jupiter', symbol: '\u2643\uFE0E', color: '#FFA500', lengthFraction: 0.60, strokeWidth: 1.5 },
-  { key: 'Saturn',  symbol: '\u2644\uFE0E', color: '#A0522D', lengthFraction: 0.55, strokeWidth: 1.5 },
-  { key: 'Uranus',  symbol: '\u2645\uFE0E', color: '#40E0D0', lengthFraction: 0.50, strokeWidth: 1.0 },
-  { key: 'Neptune', symbol: '\u2646\uFE0E', color: '#6495ED', lengthFraction: 0.50, strokeWidth: 1.0 },
+// ---- Planet orbit ring data --------------------------------
+// Planets ordered from fastest (Moon, inner ring) to slowest (Neptune, outer).
+// orbitR: SVG radius of the orbit ring, evenly spaced inward from the zodiac ring.
+const PLANET_RINGS: { key: string; symbol: string; color: string; orbitR: number }[] = [
+  { key: 'Moon',    symbol: '\u263D\uFE0E', color: '#C0C0C0', orbitR: 16 },
+  { key: 'Mercury', symbol: '\u263F\uFE0E', color: '#B8860B', orbitR: 26 },
+  { key: 'Venus',   symbol: '\u2640\uFE0E', color: '#FFB6C1', orbitR: 36 },
+  { key: 'Mars',    symbol: '\u2642\uFE0E', color: '#FF6644', orbitR: 46 },
+  { key: 'Jupiter', symbol: '\u2643\uFE0E', color: '#FFA500', orbitR: 56 },
+  { key: 'Saturn',  symbol: '\u2644\uFE0E', color: '#C09060', orbitR: 66 },
+  { key: 'Uranus',  symbol: '\u2645\uFE0E', color: '#40E0D0', orbitR: 76 },
+  { key: 'Neptune', symbol: '\u2646\uFE0E', color: '#6495ED', orbitR: 86 },
 ];
 
 // ---- Shared layout constants --------------------------------
@@ -77,9 +82,9 @@ const RING_RADIUS  = 100;
 const RING_WIDTH   = 12;
 // Sun hand length: almost reaches the ring inner edge
 const SUN_HAND_R   = RING_RADIUS - RING_WIDTH / 2 - 2;  // = 92
-// 0° Aries at the top (12-o'clock)
+// 0° Aries at the top (12-o’clock)
 const START_ANGLE  = -Math.PI / 2;
-// Distance from ring outer edge to symbol center
+// Extra space outside the ring for the zodiac symbol markers
 const ICON_OFFSET  = 30;
 const ICON_R       = RING_RADIUS + RING_WIDTH / 2 + ICON_OFFSET; // = 136
 
@@ -128,14 +133,15 @@ const ZodiacSymbols: React.FC<ZodiacSymbolsProps> = ({ activeIndex, onSignClick 
                 stroke={color} strokeWidth={1.5} opacity={0.85}
               />
             )}
-            <text
-              x={x} y={y}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize="12"
-              fill={color}
-              opacity={isActive ? 1 : 0.72}
-            >
+          {/* Symbol in white/neutral — text rendering forced by VS-15 */}
+          <text
+            x={x} y={y}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize="12"
+            fill="currentColor"
+            opacity={isActive ? 1 : 0.65}
+          >
               {sign.symbol}
             </text>
           </g>
@@ -145,40 +151,39 @@ const ZodiacSymbols: React.FC<ZodiacSymbolsProps> = ({ activeIndex, onSignClick 
   );
 };
 
-// ---- Planet hands (rendered as children) --------------------
-// Each planet is a line from the center with its symbol at the tip.
+// ---- Planet orbit rings (rendered as children) -------------
+// Each planet: a faint circular orbit ring + its symbol at the
+// current ecliptic longitude position on that ring.
 
-interface PlanetHandsProps {
+interface PlanetRingsProps {
   lons: Record<string, number>;
 }
 
-const PlanetHands: React.FC<PlanetHandsProps> = ({ lons }) => (
+const PlanetRings: React.FC<PlanetRingsProps> = ({ lons }) => (
   <>
-    {PLANETS.map(planet => {
+    {PLANET_RINGS.map(planet => {
       const lon = lons[planet.key];
       if (lon === undefined) return null;
-      const a       = (lon / 360) * 2 * Math.PI + START_ANGLE;
-      const handR   = SUN_HAND_R * planet.lengthFraction;
-      const symbolR = handR + 10; // symbol floats slightly past the tip
+      const a  = (lon / 360) * 2 * Math.PI + START_ANGLE;
+      const ix = CX + planet.orbitR * Math.cos(a);
+      const iy = CY + planet.orbitR * Math.sin(a);
       return (
         <g key={planet.key}>
-          <line
-            x1={CX} y1={CY}
-            x2={CX + handR * Math.cos(a)}
-            y2={CY + handR * Math.sin(a)}
+          {/* Faint orbit ring */}
+          <circle
+            cx={CX} cy={CY} r={planet.orbitR}
+            fill="none"
             stroke={planet.color}
-            strokeWidth={planet.strokeWidth}
-            strokeLinecap="round"
-            opacity={0.8}
+            strokeWidth={0.5}
+            opacity={0.2}
           />
+          {/* Planet symbol at current ecliptic longitude */}
           <text
-            x={CX + symbolR * Math.cos(a)}
-            y={CY + symbolR * Math.sin(a)}
+            x={ix} y={iy}
             textAnchor="middle"
             dominantBaseline="central"
-            fontSize="9"
+            fontSize="13"
             fill={planet.color}
-            opacity={0.9}
           >
             {planet.symbol}
           </text>
@@ -209,10 +214,10 @@ export const AstroClock: React.FC<AstroClockProps> = ({ date, activeIconIndex: a
     <RadialClock
       handPos={sunPos}
       colorStops={ZODIAC_COLORS}
-      // 36 ticks = one per 10°; major tick at each sign boundary (every 3 ticks)
+      // 36 ticks = one per 10°, all uniform (no major-tick grouping at sign boundaries)
       ticks={36}
-      majorTicks={Array.from({ length: 12 }, (_, i) => i * 3)}
-      labels={[]}       // signs rendered interactively in children below
+      majorTicks={[]}
+      labels={[]}       // signs rendered interactively as children below
       sectors={[]}
       icons={[]}
       startAngleOffset={START_ANGLE}
@@ -220,13 +225,29 @@ export const AstroClock: React.FC<AstroClockProps> = ({ date, activeIconIndex: a
       ringRadius={RING_RADIUS}
       ringWidth={RING_WIDTH}
       iconOffset={ICON_OFFSET}
-      innerCircleRadius={33}
+      innerCircleRadius={0}
       idPrefix="astro"
     >
-      {/* Clickable zodiac sign symbols inside the ring */}
+      {/* Planet orbit rings with symbol markers */}
+      <PlanetRings lons={lons} />
+      {/* Sun symbol at the tip of the main hand */}
+      {(() => {
+        const a = sunPos * 2 * Math.PI + START_ANGLE;
+        return (
+          <text
+            x={CX + SUN_HAND_R * Math.cos(a)}
+            y={CY + SUN_HAND_R * Math.sin(a)}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize="11"
+            fill="#FFD700"
+          >
+            &#x2609;&#xFE0E;
+          </text>
+        );
+      })()}
+      {/* Clickable zodiac sign symbols outside the ring */}
       <ZodiacSymbols activeIndex={effectiveActive} onSignClick={onSignClick} />
-      {/* Planet position hands */}
-      <PlanetHands lons={lons} />
     </RadialClock>
   );
 };
