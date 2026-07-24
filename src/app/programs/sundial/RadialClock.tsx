@@ -101,6 +101,14 @@ export interface RadialClockProps {
   /** Unique id prefix to avoid filter/gradient id collisions when multiple
    *  clocks are on the same page; default 'rc' */
   idPrefix?: string;
+
+  /** Index into the `icons` array that should receive a highlight ring.
+   *  Typically the icon matching the current position in the cycle.
+   */
+  activeIconIndex?: number;
+
+  /** Called when the user clicks an icon; receives the icon's array index. */
+  onIconClick?: (index: number) => void;
 }
 
 // ---- Helpers ------------------------------------------------
@@ -174,6 +182,8 @@ export const RadialClock: React.FC<RadialClockProps> = ({
   innerCircleRadius = 0,
   children,
   idPrefix = 'rc',
+  activeIconIndex,
+  onIconClick,
 }) => {
   const cx = size / 2;
   const cy = size / 2;
@@ -375,7 +385,22 @@ export const RadialClock: React.FC<RadialClockProps> = ({
         const lineEnd   = R + ringWidth / 2 + iconOffset - iconSize / 2 - 2;
 
         return (
-          <g key={`${idPrefix}-icon-${i}`}>
+          <g
+            key={`${idPrefix}-icon-${i}`}
+            onClick={() => onIconClick?.(i)}
+            style={{ cursor: onIconClick ? 'pointer' : undefined }}
+          >
+            {/* Highlight ring marks the active / current icon */}
+            {i === activeIconIndex && (
+              <circle
+                cx={ix} cy={iy}
+                r={iconSize / 2 + 4}
+                fill="none"
+                stroke={ic.color ?? 'currentColor'}
+                strokeWidth={1.5}
+                opacity={0.85}
+              />
+            )}
             <line
               x1={cx + lineStart * Math.cos(a)} y1={cy + lineStart * Math.sin(a)}
               x2={cx + lineEnd   * Math.cos(a)} y2={cy + lineEnd   * Math.sin(a)}

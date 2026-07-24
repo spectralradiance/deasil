@@ -14,6 +14,20 @@ import { useTheme } from '@mui/material';
 import RadialClock, { ColorStop, RingIcon, RingLabel, RingSector } from './RadialClock';
 import { SYNODIC_MONTH } from './astro';
 
+// ---- Phase data with descriptions --------------------------
+export interface PhaseInfo { name: string; description: string }
+
+export const MOON_PHASE_DATA: PhaseInfo[] = [
+  { name: 'New Moon',        description: 'Dark moon. A time of new beginnings, intention-setting, and quiet reflection.' },
+  { name: 'Waxing Crescent', description: 'A thin crescent grows. Plant seeds of desire and build toward your goals.' },
+  { name: 'First Quarter',   description: 'Half lit, gaining momentum. Make decisions and commit to your path.' },
+  { name: 'Waxing Gibbous',  description: 'Nearly full. Refine, adjust, and prepare for culmination.' },
+  { name: 'Full Moon',       description: 'Peak illumination. Celebrate completion, heightened intuition, and abundance.' },
+  { name: 'Waning Gibbous',  description: 'Sharing the harvest. Express gratitude and release what you have gained.' },
+  { name: 'Last Quarter',    description: 'Letting go. Release what no longer serves and clear space for renewal.' },
+  { name: 'Waning Crescent', description: 'Dark returning. Rest, surrender, and prepare for the next cycle.' },
+];
+
 // ---- Color palette ------------------------------------------
 // Colors reflect the illumination level around the lunar cycle.
 // pos=0 is new moon (dark), pos=0.5 is full moon (bright).
@@ -103,10 +117,19 @@ const MoonDisc: React.FC<{ percent: number; cx: number; cy: number; R: number }>
 interface MoonClockProps {
   /** Lunar age as a 0–1 fraction (0 = new moon, 0.5 = full moon) */
   percent: number;
+  /** Called when the user clicks a phase icon; receives the phase index 0–7 */
+  onIconClick?: (index: number) => void;
+  /** Override for the highlighted icon; defaults to the computed current phase */
+  activeIconIndex?: number;
 }
 
-export const MoonClock: React.FC<MoonClockProps> = ({ percent }) => {
+export const MoonClock: React.FC<MoonClockProps> = ({ percent, onIconClick, activeIconIndex: activeOverride }) => {
   const theme = useTheme();
+
+  // Index of the current phase, used to highlight the matching icon
+  const activePhaseIndex = Math.round(percent * 8) % 8;
+  // Use the override when the user has selected a phase, otherwise follow the clock
+  const effectiveActive  = activeOverride ?? activePhaseIndex;
 
   // Pass a CSS filter string so RadialClock can apply it directly to each <image>.
   // This inverts the icons to white in dark mode and renders them black in light mode.
@@ -117,11 +140,11 @@ export const MoonClock: React.FC<MoonClockProps> = ({ percent }) => {
   const icons: RingIcon[] = PHASE_ICONS.map(ic => ({ ...ic, filterStyle: iconFilterStyle }));
 
   // SVG center for the moon disc
-  const size     = 200;
+  const size     = 280;
   const cx       = size / 2;
   const cy       = size / 2;
-  // 33% of the ring radius (72) — matches the inner circle proportion of other clocks
-  const discR    = Math.round(72 * 0.33); // ~24
+  // 33% of the ring radius (100) — matches the inner circle proportion of other clocks
+  const discR    = Math.round(100 * 0.33); // ~33
 
   return (
     <RadialClock
@@ -135,11 +158,13 @@ export const MoonClock: React.FC<MoonClockProps> = ({ percent }) => {
       startAngleOffset={Math.PI / 2}
       icons={icons}
       size={size}
-      ringRadius={72}
+      ringRadius={100}
       ringWidth={8}
       iconOffset={30}
       innerCircleRadius={discR}
       idPrefix="moon"
+      activeIconIndex={effectiveActive}
+      onIconClick={onIconClick}
     >
       {/* Moon phase disc rendered in the center of the clock */}
       <MoonDisc percent={percent} cx={cx} cy={cy} R={discR} />

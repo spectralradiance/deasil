@@ -28,6 +28,25 @@ const SABBATS: { name: string; shortName: string; icon: string; dateLabel: strin
   { name: 'Mabon',      shortName: 'Mabon',    icon: '/sundial/year/mabon.svg',    dateLabel: '9/22'  },
 ];
 
+// ---- Sabbat info with descriptions ------------------------
+const SABBAT_DESCRIPTIONS = [
+  'Celtic new year. The veil thins; honor ancestors and the cycle of death and rebirth.',
+  'Winter solstice. The longest night; celebrate the sun\'s return and the promise of light.',
+  'Stirring of spring. Honor creativity, the sacred flame, and new beginnings.',
+  'Spring equinox. Balance of light and dark; celebrate growth and renewal.',
+  'May Day fires of fertility and vitality; the world bursts into full bloom.',
+  'Summer solstice. The sun at its peak; celebrate abundance and the fullness of life.',
+  'First harvest. Give thanks for the fruits of your labor; begin the turn toward autumn.',
+  'Autumn equinox. Second harvest; seek balance, gratitude, and readiness for the dark half.',
+];
+
+export interface SabbatInfo { name: string; dateLabel: string; description: string }
+export const SABBAT_DATA: SabbatInfo[] = SABBATS.map((sab, i) => ({
+  name:        sab.name,
+  dateLabel:   sab.dateLabel,
+  description: SABBAT_DESCRIPTIONS[i],
+}));
+
 // ---- Seasonal color palette ---------------------------------
 // One color per sabbat; the gradient ring blends between adjacent colors.
 const SEASONAL_COLORS: ColorStop[] = SABBATS.map((_, i) => ({
@@ -72,7 +91,7 @@ const YEAR_MAJOR_TICKS = [0, 5, 10, 15, 20, 25, 30, 35];
 // Jan 1 is approximately 61 days after Samhain (Nov 1).
 const SAMHAIN_OFFSET_DAYS = 61;
 
-function dayOfYearToFraction(date: Date): number {
+export function dayOfYearToFraction(date: Date): number {
   const start = new Date(date.getFullYear(), 0, 0);
   const diff  = date.getTime() - start.getTime();
   const dayOfYear = Math.floor(diff / 86400000); // 1–365
@@ -83,11 +102,20 @@ function dayOfYearToFraction(date: Date): number {
 
 interface YearClockProps {
   date: Date;
+  /** Called when the user clicks a sabbat icon; receives the sabbat index 0–7 */
+  onIconClick?: (index: number) => void;
+  /** Override for the highlighted icon; defaults to the most-recently-passed sabbat */
+  activeIconIndex?: number;
 }
 
-export const YearClock: React.FC<YearClockProps> = ({ date }) => {
+export const YearClock: React.FC<YearClockProps> = ({ date, onIconClick, activeIconIndex: activeOverride }) => {
   const theme    = useTheme();
   const handPos  = dayOfYearToFraction(date);
+
+  // Index of the most-recently-passed sabbat, used to highlight the matching icon
+  const activeSabbatIndex = Math.floor(handPos * 8) % 8;
+  // Use the override when the user has selected a sabbat, otherwise follow the clock
+  const effectiveActive   = activeOverride ?? activeSabbatIndex;
 
   // Render sabbat SVG icons as flat silhouettes: white in dark mode, black in light.
   const iconFilterStyle = theme.palette.mode === 'dark'
@@ -119,6 +147,8 @@ export const YearClock: React.FC<YearClockProps> = ({ date }) => {
       iconOffset={28}
       innerCircleRadius={33}
       idPrefix="year"
+      activeIconIndex={effectiveActive}
+      onIconClick={onIconClick}
     />
   );
 };

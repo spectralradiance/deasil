@@ -144,3 +144,48 @@ export function lerpColor(hex0: string, hex1: string, t: number): string {
   const c1 = parse(hex1);
   return `rgb(${Math.round(c0.r + (c1.r - c0.r) * t)}, ${Math.round(c0.g + (c1.g - c0.g) * t)}, ${Math.round(c0.b + (c1.b - c0.b) * t)})`;
 }
+
+// ---- Planet positions ---------------------------------------
+
+/** Days since J2000.0 (2000 Jan 1.5 = JD 2451545.0) */
+function daysSinceJ2000(date: Date): number {
+  return dateToJulian(date) - 2451545.0;
+}
+
+/** Reduce degrees to [0, 360) */
+function normDeg(deg: number): number {
+  return ((deg % 360) + 360) % 360;
+}
+
+/**
+ * Approximate ecliptic longitude (0–360°) for the Sun and major planets.
+ * The Sun is corrected to ~1° accuracy. Planets use mean longitude only
+ * and may be off by several degrees, which is sufficient for a visual display.
+ */
+export function calcPlanetLongitudes(date: Date): Record<string, number> {
+  const d = daysSinceJ2000(date);
+
+  // Sun: mean longitude + equation-of-centre correction
+  const Lsun = normDeg(280.46 + 0.9856474 * d);
+  const Msun = normDeg(357.53 + 0.9856003 * d);
+  const Mr   = (Msun * Math.PI) / 180;
+  const sun  = normDeg(Lsun + 1.915 * Math.sin(Mr) + 0.020 * Math.sin(2 * Mr));
+
+  // Moon: simplified Brown theory term
+  const moonL0 = normDeg(218.316 + 13.176396 * d);
+  const moonM  = normDeg(134.963 + 13.064993 * d);
+  const moonMr = (moonM * Math.PI) / 180;
+  const moon   = normDeg(moonL0 + 6.289 * Math.sin(moonMr));
+
+  return {
+    Sun:     sun,
+    Moon:    moon,
+    Mercury: normDeg(252.25 + 4.09236 * d),
+    Venus:   normDeg(181.98 + 1.60214 * d),
+    Mars:    normDeg(355.43 + 0.52402 * d),
+    Jupiter: normDeg( 34.33 + 0.08309 * d),
+    Saturn:  normDeg( 50.08 + 0.03346 * d),
+    Uranus:  normDeg(314.20 + 0.01172 * d),
+    Neptune: normDeg(304.22 + 0.00598 * d),
+  };
+}

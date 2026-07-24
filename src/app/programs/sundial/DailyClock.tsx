@@ -126,11 +126,11 @@ export const DailyClock: React.FC<DailyClockProps> = ({ date, sunrise, sunset })
       // pos=0 → midnight → bottom of clock (Math.PI/2)
       startAngleOffset={Math.PI / 2}
       icons={icons}
-      size={200}
-      ringRadius={72}
+      size={280}
+      ringRadius={100}
       ringWidth={8}
       iconOffset={30}
-      innerCircleRadius={24}
+      innerCircleRadius={33}
       idPrefix="daily"
     />
   );
