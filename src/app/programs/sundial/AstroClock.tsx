@@ -45,18 +45,18 @@ export const ZODIAC_DATA: ZodiacInfo[] = [
 // Quality:     Card   Fixed   Mutable  Card    Fixed   Mutable
 //              Card   Fixed   Mutable  Card    Fixed   Mutable
 const ZODIAC_COLORS: ColorStop[] = [
-  { pos:  0 / 12, hex: '#FF6633' }, // Aries        — Fire   Cardinal (light)
-  { pos:  1 / 12, hex: '#4A7A30' }, // Taurus       — Earth  Fixed    (medium)
-  { pos:  2 / 12, hex: '#7A6000' }, // Gemini       — Air    Mutable  (dark)
-  { pos:  3 / 12, hex: '#88CCEE' }, // Cancer       — Water  Cardinal (light)
-  { pos:  4 / 12, hex: '#CC2211' }, // Leo          — Fire   Fixed    (medium)
-  { pos:  5 / 12, hex: '#3A5A20' }, // Virgo        — Earth  Mutable  (dark)
-  { pos:  6 / 12, hex: '#FFDD44' }, // Libra        — Air    Cardinal (light)
-  { pos:  7 / 12, hex: '#3355CC' }, // Scorpio      — Water  Fixed    (medium)
-  { pos:  8 / 12, hex: '#AA3311' }, // Sagittarius  — Fire   Mutable  (dark)
-  { pos:  9 / 12, hex: '#88BB88' }, // Capricorn    — Earth  Cardinal (light)
-  { pos: 10 / 12, hex: '#AA8800' }, // Aquarius     — Air    Fixed    (medium)
-  { pos: 11 / 12, hex: '#2233AA' }, // Pisces       — Water  Mutable  (dark)
+  { pos:  0 / 12, hex: '#FF3322' }, // Aries        — Fire   (vivid red)
+  { pos:  1 / 12, hex: '#33AA55' }, // Taurus       — Earth  (vibrant emerald)
+  { pos:  2 / 12, hex: '#FFDD22' }, // Gemini       — Air    (bright gold)
+  { pos:  3 / 12, hex: '#44AACC' }, // Cancer       — Water  (aqua)
+  { pos:  4 / 12, hex: '#FF8800' }, // Leo          — Fire   (golden orange)
+  { pos:  5 / 12, hex: '#77BB22' }, // Virgo        — Earth  (chartreuse)
+  { pos:  6 / 12, hex: '#AADDFF' }, // Libra        — Air    (baby blue)
+  { pos:  7 / 12, hex: '#2255BB' }, // Scorpio      — Water  (deep indigo blue)
+  { pos:  8 / 12, hex: '#CC3300' }, // Sagittarius  — Fire   (deep red-orange)
+  { pos:  9 / 12, hex: '#228855' }, // Capricorn    — Earth  (forest green)
+  { pos: 10 / 12, hex: '#55CCEE' }, // Aquarius     — Air    (bright cyan)
+  { pos: 11 / 12, hex: '#6688DD' }, // Pisces       — Water  (periwinkle blue)
 ];
 
 // ---- Planet orbit ring data --------------------------------
@@ -100,8 +100,8 @@ interface ZodiacSymbolsProps {
 
 const ZodiacSymbols: React.FC<ZodiacSymbolsProps> = ({ activeIndex, onSignClick }) => {
   // Connector line: from just outside the ring outer edge to just before the symbol
-  const lineStart = RING_RADIUS + RING_WIDTH / 2 + 2;
-  const lineEnd   = ICON_R - 13;
+  const lineStart = RING_RADIUS + RING_WIDTH / 2;
+  const lineEnd   = RING_RADIUS + RING_WIDTH;
   return (
     <>
       {ZODIAC_DATA.map((sign, i) => {
@@ -122,13 +122,13 @@ const ZodiacSymbols: React.FC<ZodiacSymbolsProps> = ({ activeIndex, onSignClick 
               x1={CX + lineStart * Math.cos(a)} y1={CY + lineStart * Math.sin(a)}
               x2={CX + lineEnd   * Math.cos(a)} y2={CY + lineEnd   * Math.sin(a)}
               stroke={color}
-              strokeWidth={1}
+              strokeWidth={2}
               opacity={0.45}
             />
             {/* Highlight ring for the Sun’s current sign */}
             {isActive && (
               <circle
-                cx={x} cy={y} r={11}
+                cx={x} cy={y} r={16}
                 fill="none"
                 stroke={color} strokeWidth={1.5} opacity={0.85}
               />
@@ -138,9 +138,8 @@ const ZodiacSymbols: React.FC<ZodiacSymbolsProps> = ({ activeIndex, onSignClick 
             x={x} y={y}
             textAnchor="middle"
             dominantBaseline="central"
-            fontSize="12"
+            fontSize="16"
             fill="currentColor"
-            opacity={isActive ? 1 : 0.65}
           >
               {sign.symbol}
             </text>

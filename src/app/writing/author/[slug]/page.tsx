@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 import { Box, Typography, Card, CardActionArea, CardContent, CardMedia } from "@mui/material";
 import { client } from "../../../sanity-client";
@@ -53,26 +51,12 @@ async function getAuthorPosts(slug: string) {
   return posts;
 }
 
-import { useParams } from "next/navigation";
-
-export default function AuthorPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-  const [posts, setPosts] = React.useState<Post[]>([]);
-  const [author, setAuthor] = React.useState<Author | null>(null);
-
-  React.useEffect(() => {
-    if (!slug) return;
-    async function fetchData() {
-      const [authorData, postsData] = await Promise.all([
-        getAuthor(slug),
-        getAuthorPosts(slug),
-      ]);
-      setAuthor(authorData);
-      setPosts(postsData);
-    }
-    fetchData();
-  }, [slug]);
+async function AuthorPage({ params }: { params: { slug: string } }) {
+  const slug = params.slug;
+  const [author, posts] = await Promise.all([
+    getAuthor(slug),
+    getAuthorPosts(slug),
+  ]);
 
   return (
     <Box sx={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", mt: 4 }}>
