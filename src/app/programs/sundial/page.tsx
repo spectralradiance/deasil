@@ -9,7 +9,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
 import { DailyClock } from './DailyClock';
 import { MoonClock, MOON_PHASE_DATA }  from './MoonClock';
 import { YearClock, SABBAT_DATA, dayOfYearToFraction } from './YearClock';
@@ -52,16 +56,24 @@ export default function SundialPage() {
   const [time, setTime]     = useState(new Date());
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
 
+  const [paused, setPaused]           = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [pickedDateTime, setPickedDateTime] = useState('');
+  const [latInput, setLatInput]       = useState('');
+  const [lonInput, setLonInput]       = useState('');
+
   // Tracks which icon the user last clicked; null = follow the live current position
   const [moonSelectedIdx, setMoonSelectedIdx] = useState<number | null>(null);
   const [yearSelectedIdx, setYearSelectedIdx] = useState<number | null>(null);
   const [astroSelectedIdx, setAstroSelectedIdx] = useState<number | null>(null);
 
-  // Tick every millisecond for smooth hand movement
+  // Tick every millisecond for smooth hand movement; stops when paused
   useEffect(() => {
+    if (paused) return;
     const id = setInterval(() => setTime(new Date()), 1);
     return () => clearInterval(id);
-  }, []);
+  }, [paused]);
 
   // Request geolocation once for sunrise/sunset calculation
   useEffect(() => {
@@ -112,25 +124,129 @@ export default function SundialPage() {
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 4, gap: 6 }}>
       <h1>Sundial</h1>
 
-      {/* ── Live timestamp ── */}
-      <Typography variant="h3" component="div" sx={{ display: 'flex', alignItems: 'baseline', gap: '0.15em' }}>
-        <span style={{ display: 'inline-block', width: '4ch', textAlign: 'center' }}>{year}</span>
-        <span>:</span>
-        <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{month}</span>
-        <span>:</span>
-        <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{day}</span>
-        <span>  </span>
-        <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{hours}</span>
-        <span>:</span>
-        <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{minutes}</span>
-        <span>:</span>
-        <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{seconds}</span>
-        <span>:</span>
-        <span style={{ display: 'inline-block', width: '3ch', textAlign: 'center' }}>{milliseconds}</span>
-      </Typography>
+      {/* ── Live timestamp + controls ── */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <Typography variant="h3" component="div" sx={{ display: 'flex', alignItems: 'baseline', gap: '0.15em' }}>
+          <span style={{ display: 'inline-block', width: '4ch', textAlign: 'center' }}>{year}</span>
+          <span>:</span>
+          <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{month}</span>
+          <span>:</span>
+          <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{day}</span>
+          <span>  </span>
+          <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{hours}</span>
+          <span>:</span>
+          <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{minutes}</span>
+          <span>:</span>
+          <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{seconds}</span>
+          <span>:</span>
+          <span style={{ display: 'inline-block', width: '3ch', textAlign: 'center' }}>{milliseconds}</span>
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 0.5, ml: 1 }}>
+          <IconButton
+            size="small"
+            onClick={() => setPaused(p => !p)}
+            title={paused ? 'Resume' : 'Pause'}
+          >
+            {paused ? <PlayArrowIcon /> : <PauseIcon />}
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => {
+              const pad = (n: number, d = 2) => n.toString().padStart(d, '0');
+              const t = time;
+              setPickedDateTime(
+                `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`
+              );
+              setCalendarOpen(true);
+            }}
+            title="Pick date & time"
+          >
+            <CalendarMonthIcon />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => {
+              setLatInput(coords ? coords.lat.toString() : '');
+              setLonInput(coords ? coords.lon.toString() : '');
+              setLocationOpen(true);
+            }}
+            title="Set location"
+          >
+            <MyLocationIcon />
+          </IconButton>
+        </Box>
+      </Box>
+
+      {/* ── Date/time picker dialog ── */}
+      <Dialog open={calendarOpen} onClose={() => setCalendarOpen(false)}>
+        <DialogTitle>Pick date &amp; time</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <TextField
+            type="datetime-local"
+            value={pickedDateTime}
+            onChange={e => setPickedDateTime(e.target.value)}
+            inputProps={{ step: 1 }}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCalendarOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (pickedDateTime) {
+                setTime(new Date(pickedDateTime));
+                setPaused(true);
+              }
+              setCalendarOpen(false);
+            }}
+          >
+            Set
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Location picker dialog ── */}
+      <Dialog open={locationOpen} onClose={() => setLocationOpen(false)}>
+        <DialogTitle>Set location</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2, minWidth: 280 }}>
+          <TextField
+            label="Latitude"
+            type="number"
+            value={latInput}
+            onChange={e => setLatInput(e.target.value)}
+            inputProps={{ min: -90, max: 90, step: 0.0001 }}
+            fullWidth
+          />
+          <TextField
+            label="Longitude"
+            type="number"
+            value={lonInput}
+            onChange={e => setLonInput(e.target.value)}
+            inputProps={{ min: -180, max: 180, step: 0.0001 }}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLocationOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              const lat = parseFloat(latInput);
+              const lon = parseFloat(lonInput);
+              if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                setCoords({ lat, lon });
+              }
+              setLocationOpen(false);
+            }}
+          >
+            Set
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── Daily (solar) clock ── */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', gap: 4, width: '100%' }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', justifyContent: 'center', gap: 4, width: '100%' }}>
         <Box sx={CLOCK_WRAPPER_SX}>
           <DailyClock date={time} sunrise={sunTimes.sunrise} sunset={sunTimes.sunset} />
         </Box>
@@ -156,10 +272,11 @@ export default function SundialPage() {
       </Box>
 
       {/* ── Moon clock ── */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', gap: 4, width: '100%' }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', justifyContent: 'center', gap: 4, width: '100%' }}>
         <Box sx={CLOCK_WRAPPER_SX}>
           <MoonClock
             percent={moonPercent}
+            date={time}
             activeIconIndex={moonDisplayIdx}
             onIconClick={(i) => setMoonSelectedIdx(prev => prev === i ? null : i)}
           />
@@ -174,6 +291,19 @@ export default function SundialPage() {
           <Typography variant="subtitle1" sx={{ mt: 1, fontWeight: 500 }}>
             {MOON_PHASE_DATA[moonDisplayIdx].name}
           </Typography>
+          {(() => {
+            const pos       = moonDisplayIdx / 8;
+            const daysUntil = ((pos - moonPercent + 1) % 1) * SYNODIC_MONTH;
+            const daysAgo   = SYNODIC_MONTH - daysUntil;
+            const fmt       = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+            const past      = fmt(new Date(time.getTime() - daysAgo   * 86400000));
+            const next      = fmt(new Date(time.getTime() + daysUntil * 86400000));
+            return (
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Past: {past} · Next: {next}
+              </Typography>
+            );
+          })()}
           <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
             {MOON_PHASE_DATA[moonDisplayIdx].description}
           </Typography>
@@ -190,7 +320,7 @@ export default function SundialPage() {
       </Box>
 
       {/* ── Wheel of the Year clock ── */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', gap: 4, width: '100%' }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', justifyContent: 'center', gap: 4, width: '100%' }}>
         <Box sx={CLOCK_WRAPPER_SX}>
           <YearClock
             date={time}
@@ -235,7 +365,7 @@ export default function SundialPage() {
       </Box>
 
       {/* ── Astrological / zodiac clock ── */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', gap: 4, width: '100%' }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'flex-start', justifyContent: 'center', gap: 4, width: '100%' }}>
         <Box sx={CLOCK_WRAPPER_SX}>
           <AstroClock
             date={time}

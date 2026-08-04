@@ -7,7 +7,6 @@
 show hamburger menu on each page, expand to show icons
 - share - social media icons, email icon, link icon (copy link)
 - light/dark mode
-- table of contents
 
 
 - top-right button humburger menu
@@ -17,10 +16,19 @@ show hamburger menu on each page, expand to show icons
 
 ## Writing
 
+### Features
+
+- Articles, Authors, Categories
+
+### Todo
+
 - floating collapsible table of contents
 
 
 ## Photography
+
+
+### Features
 
 - Lightbox
   - Buy
@@ -28,41 +36,51 @@ show hamburger menu on each page, expand to show icons
   - Toggle metadata
   - Close
 
+### Todo
+
 ## Programs
 
 ### Sundial
 
+#### Features
 
-- Types of dials
-- Able to add or remove?
-- Allow user to download svg
-- Show calendar and play icons - calendar allows the user to set a particular datetime, play sets it to the preset
-
-- Types of calendars
-  - day
+- Sun clock - time of day
     - icons: sunrise, sunset, solar noon, solar midnight
     - lines: current time of day
     - colors: blue-orange
     - text: morning, midday, evening, night
     - info: twilight, golden hour, blue hour
-  - moon
+- Moon clock - monthly cycle
     - icons: phases of the moon
     - lines: current phase of the moon
-    - colors: ?
+    - colors: gradient from black to white
     - text: waxing/waning
     - info: current phase, distance, last phase and datetime, next phase and datetime, next eclipse, last eclipse
-  - wheel of the year
+- Season clock - wheel of the year
     - icons: eight sabbaths
     - lines: current day of the year
     - colors: rainbow
     - text: seasons (4), months (12)?
     - info: ??
-  - astrological year
+- Star clock - astrology
     - icons: 12 astrological symbols
     - lines: sun, moon, planets
     - colors: mutable/fixed?
     - text: ?
     - info: ?
+
+
+#### Errors
+
+- sun clock coloration should be yellow (morning)
+
+#### Todo
+
+- Add/move/remove clocks
+- Allow user to download svg for specific clock, or all clocks
+- Datetime controls
+  - Show calendar and play/pause icons - calendar allows the user to set a particular datetime, play sets it to the preset
+  - Set location manually
 - important events in history that happened today?
 - ecospiritual reflection?
 - day of the week?
@@ -93,6 +111,8 @@ show hamburger menu on each page, expand to show icons
 
 ### Glyph
 
+- add runes/ogham to altar
+
 Very little historiocity. Glyph in an app to work with ancient character sets, translating from English
 
 - Included character sets
@@ -104,3 +124,19 @@ Very little historiocity. Glyph in an app to work with ancient character sets, t
   - Ogham - Cernunnos
   - Greek - Chaos (χάος), Odysseus
   - Not only Gods but words for "river", "earth", "time"
+
+
+### Voluspa
+
+#### Features
+
+- view full text, stanza comparison
+
+#### Todo
+
+- hide individual stanza view, user can just use comparison view
+- show icons for views instead of text
+- put the stanza arrows in a row with the full text / comparison buttons allow the user between 
+- expand/collapse stanzas when comparing translations
+- quality control - make sure stanzas match up, add newlines to introductions and format them better
+- clearer citations

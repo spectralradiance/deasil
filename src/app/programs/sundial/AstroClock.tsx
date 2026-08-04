@@ -32,32 +32,17 @@ export const ZODIAC_DATA: ZodiacInfo[] = [
   { name: 'Pisces',       symbol: '♓︎', description: 'Compassionate, dreamy, and spiritual. Season of endings and transcendence.' },
 ];
 
-// ---- Zodiac gradient colors — element × quality scheme -----
-// Each sign inherits its element's hue at a luminance that reflects its quality:
-//   Cardinal (initiating)  → light shade
-//   Fixed    (stable)      → medium shade
-//   Mutable  (transitional)→ dark shade
-//
-// Sign order:  Aries  Taurus  Gemini   Cancer  Leo     Virgo
-//              Libra  Scorpio Sagittar Capricorn Aquarius Pisces
-// Element:     Fire   Earth   Air      Water   Fire    Earth
-//              Air    Water   Fire     Earth   Air     Water
-// Quality:     Card   Fixed   Mutable  Card    Fixed   Mutable
-//              Card   Fixed   Mutable  Card    Fixed   Mutable
-const ZODIAC_COLORS: ColorStop[] = [
-  { pos:  0 / 12, hex: '#FF3322' }, // Aries        — Fire   (vivid red)
-  { pos:  1 / 12, hex: '#33AA55' }, // Taurus       — Earth  (vibrant emerald)
-  { pos:  2 / 12, hex: '#FFDD22' }, // Gemini       — Air    (bright gold)
-  { pos:  3 / 12, hex: '#44AACC' }, // Cancer       — Water  (aqua)
-  { pos:  4 / 12, hex: '#FF8800' }, // Leo          — Fire   (golden orange)
-  { pos:  5 / 12, hex: '#77BB22' }, // Virgo        — Earth  (chartreuse)
-  { pos:  6 / 12, hex: '#AADDFF' }, // Libra        — Air    (baby blue)
-  { pos:  7 / 12, hex: '#2255BB' }, // Scorpio      — Water  (deep indigo blue)
-  { pos:  8 / 12, hex: '#CC3300' }, // Sagittarius  — Fire   (deep red-orange)
-  { pos:  9 / 12, hex: '#228855' }, // Capricorn    — Earth  (forest green)
-  { pos: 10 / 12, hex: '#55CCEE' }, // Aquarius     — Air    (bright cyan)
-  { pos: 11 / 12, hex: '#6688DD' }, // Pisces       — Water  (periwinkle blue)
-];
+// ---- Zodiac element colors — one flat color per element ----
+// Paired stops (start + end-ε) produce solid bands with sharp boundaries.
+const FIRE  = '#EE3311';
+const EARTH = '#44AA44';
+const AIR   = '#DDCC22';
+const WATER = '#2288BB';
+const SIGN_ELEMENTS = [FIRE, EARTH, AIR, WATER, FIRE, EARTH, AIR, WATER, FIRE, EARTH, AIR, WATER];
+const ZODIAC_COLORS: ColorStop[] = SIGN_ELEMENTS.flatMap((color, i) => [
+  { pos: i / 12,            hex: color },
+  { pos: (i + 1) / 12 - 0.001, hex: color },
+]);
 
 // ---- Planet orbit ring data --------------------------------
 // Planets ordered from fastest (Moon, inner ring) to slowest (Neptune, outer).

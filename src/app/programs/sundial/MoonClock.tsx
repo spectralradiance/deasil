@@ -9,7 +9,7 @@
 // ============================================================
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTheme } from '@mui/material';
 import RadialClock, { ColorStop, RingIcon, RingLabel, RingSector } from './RadialClock';
 import { SYNODIC_MONTH } from './astro';
@@ -57,11 +57,7 @@ const PHASE_ICONS: RingIcon[] = [
 const MOON_TICKS = 32;
 const MOON_MAJOR_TICKS = [0, 4, 8, 12, 16, 20, 24, 28];
 
-// Day-of-cycle labels at the 8 major phase positions (one decimal place)
-const MOON_LABELS: RingLabel[] = PHASE_ICONS.map(ic => ({
-  pos: ic.pos,
-  text: (ic.pos * SYNODIC_MONTH).toFixed(1),
-}));
+// Day-of-phase labels are computed dynamically; no static constant here.
 
 // ---- Sectors ------------------------------------------------
 const MOON_SECTORS: RingSector[] = [
@@ -117,19 +113,34 @@ const MoonDisc: React.FC<{ percent: number; cx: number; cy: number; R: number }>
 interface MoonClockProps {
   /** Lunar age as a 0–1 fraction (0 = new moon, 0.5 = full moon) */
   percent: number;
+  /** Current date, used to compute the calendar date of each upcoming phase */
+  date?: Date;
   /** Called when the user clicks a phase icon; receives the phase index 0–7 */
   onIconClick?: (index: number) => void;
   /** Override for the highlighted icon; defaults to the computed current phase */
   activeIconIndex?: number;
 }
 
-export const MoonClock: React.FC<MoonClockProps> = ({ percent, onIconClick, activeIconIndex: activeOverride }) => {
+export const MoonClock: React.FC<MoonClockProps> = ({ percent, date, onIconClick, activeIconIndex: activeOverride }) => {
   const theme = useTheme();
 
   // Index of the current phase, used to highlight the matching icon
   const activePhaseIndex = Math.round(percent * 8) % 8;
   // Use the override when the user has selected a phase, otherwise follow the clock
   const effectiveActive  = activeOverride ?? activePhaseIndex;
+
+  // Recompute phase dates once per day (percent changes every ms but the date won't)
+  const now = date ?? new Date();
+  const dayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+  const moonLabels: RingLabel[] = useMemo(() => {
+    const ref = date ?? new Date();
+    return PHASE_ICONS.map(ic => {
+      const daysUntil = ((ic.pos - percent + 1) % 1) * SYNODIC_MONTH;
+      const phaseDate = new Date(ref.getTime() + daysUntil * 24 * 60 * 60 * 1000);
+      return { pos: ic.pos, text: `${phaseDate.getMonth() + 1}/${phaseDate.getDate()}` };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayKey]);
 
   // Pass a CSS filter string so RadialClock can apply it directly to each <image>.
   // This inverts the icons to white in dark mode and renders them black in light mode.
@@ -152,7 +163,7 @@ export const MoonClock: React.FC<MoonClockProps> = ({ percent, onIconClick, acti
       colorStops={MOON_COLORS}
       ticks={MOON_TICKS}
       majorTicks={MOON_MAJOR_TICKS}
-      labels={MOON_LABELS}
+      labels={moonLabels}
       sectors={MOON_SECTORS}
       // pos=0 (new moon) at bottom (Math.PI/2)
       startAngleOffset={Math.PI / 2}

@@ -16,8 +16,8 @@ import RadialClock, { ColorStop, RingIcon, RingLabel, RingSector } from './Radia
 // Four color stops evenly spaced; pos=0 is midnight (bottom of clock)
 const DAY_COLORS: ColorStop[] = [
   { pos: 0,    hex: '#0000ff' }, // midnight — deep blue
-  { pos: 0.25, hex: '#fafad2' }, // 6 AM dawn — pale yellow
-  { pos: 0.5,  hex: '#FFD700' }, // noon — gold
+  { pos: 0.25, hex: '#FFD700' }, // 6 AM dawn — pale yellow
+  { pos: 0.5,  hex: '#fafad2' }, // noon — gold
   { pos: 0.75, hex: '#FF8C00' }, // 6 PM dusk — dark orange
 ];
 
