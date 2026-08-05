@@ -189,3 +189,40 @@ export function calcPlanetLongitudes(date: Date): Record<string, number> {
     Neptune: normDeg(304.22 + 0.00598 * d),
   };
 }
+
+// ---- Aspect calculations ------------------------------------
+
+export interface Aspect {
+  body1: string;
+  body2: string;
+  type:  'Conjunction' | 'Sextile' | 'Square' | 'Trine' | 'Opposition';
+  exact: number;   // exact aspect angle (0 | 60 | 90 | 120 | 180)
+  orb:   number;   // degrees from exact
+}
+
+const ASPECT_DEFS: { type: Aspect['type']; angle: number; maxOrb: number }[] = [
+  { type: 'Conjunction', angle:   0, maxOrb: 8 },
+  { type: 'Sextile',     angle:  60, maxOrb: 6 },
+  { type: 'Square',      angle:  90, maxOrb: 8 },
+  { type: 'Trine',       angle: 120, maxOrb: 8 },
+  { type: 'Opposition',  angle: 180, maxOrb: 8 },
+];
+
+/** Compute all major aspects among the supplied ecliptic longitudes */
+export function calcAspects(lons: Record<string, number>): Aspect[] {
+  const bodies = Object.keys(lons);
+  const result: Aspect[] = [];
+  for (let i = 0; i < bodies.length; i++) {
+    for (let j = i + 1; j < bodies.length; j++) {
+      const raw = Math.abs(((lons[bodies[i]] - lons[bodies[j]]) % 360 + 360) % 360);
+      const sep = raw > 180 ? 360 - raw : raw;
+      for (const def of ASPECT_DEFS) {
+        const orb = Math.abs(sep - def.angle);
+        if (orb <= def.maxOrb) {
+          result.push({ body1: bodies[i], body2: bodies[j], type: def.type, exact: def.angle, orb });
+        }
+      }
+    }
+  }
+  return result;
+}

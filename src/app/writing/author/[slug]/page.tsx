@@ -51,7 +51,7 @@ async function getAuthorPosts(slug: string) {
   return posts;
 }
 
-async function AuthorPage({ params }: { params: { slug: string } }) {
+export default async function AuthorPage({ params }: { params: { slug: string } }) {
   const slug = params.slug;
   const [author, posts] = await Promise.all([
     getAuthor(slug),

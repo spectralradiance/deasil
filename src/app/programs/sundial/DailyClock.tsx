@@ -12,6 +12,16 @@
 import React, { useMemo } from 'react';
 import RadialClock, { ColorStop, RingIcon, RingLabel, RingSector } from './RadialClock';
 
+// ---- Solar event descriptions -------------------------------
+// Index matches the icons array order: 0=sunrise, 1=noon, 2=sunset, 3=midnight
+export interface SolarEventInfo { name: string; description: string }
+export const SOLAR_EVENT_DATA: SolarEventInfo[] = [
+  { name: 'Sunrise',        description: 'The sun crests the horizon. Day breaks, the world stirs, and light reclaims the sky.' },
+  { name: 'Solar Noon',     description: 'The sun stands at its zenith. Shadows are shortest; solar energy reaches its peak.' },
+  { name: 'Sunset',         description: 'The sun sinks below the horizon. Warmth lingers as night prepares to take hold.' },
+  { name: 'Solar Midnight', description: 'The sun lies directly underfoot. The nadir of darkness; a hinge between two halves of night.' },
+];
+
 // ---- Color palette ------------------------------------------
 // Four color stops evenly spaced; pos=0 is midnight (bottom of clock)
 const DAY_COLORS: ColorStop[] = [
@@ -73,9 +83,11 @@ interface DailyClockProps {
   date: Date;
   sunrise?: Date | null;
   sunset?: Date | null;
+  onIconClick?: (index: number) => void;
+  activeIconIndex?: number;
 }
 
-export const DailyClock: React.FC<DailyClockProps> = ({ date, sunrise, sunset }) => {
+export const DailyClock: React.FC<DailyClockProps> = ({ date, sunrise, sunset, onIconClick, activeIconIndex }) => {
   // Hand position: fraction of 24h day
   const handPos = dateToFraction(date);
 
@@ -88,6 +100,17 @@ export const DailyClock: React.FC<DailyClockProps> = ({ date, sunrise, sunset })
     () => solarNoon ? new Date(solarNoon.getTime() + 12 * 3600 * 1000) : null,
     [solarNoon],
   );
+
+  // Rotate color stops to align with actual solar events when available
+  const colorStops = useMemo((): ColorStop[] => {
+    if (!sunrise || !solarNoon || !sunset || !solarMidnight) return DAY_COLORS;
+    return [
+      { pos: dateToFraction(solarMidnight), hex: '#0000ff' },
+      { pos: dateToFraction(sunrise),       hex: '#FFD700' },
+      { pos: dateToFraction(solarNoon),     hex: '#fafad2' },
+      { pos: dateToFraction(sunset),        hex: '#FF8C00' },
+    ].sort((a, b) => a.pos - b.pos);
+  }, [sunrise, solarNoon, sunset, solarMidnight]);
 
   // Build icon list from available solar events
   const icons: RingIcon[] = useMemo(() => {
@@ -118,7 +141,7 @@ export const DailyClock: React.FC<DailyClockProps> = ({ date, sunrise, sunset })
   return (
     <RadialClock
       handPos={handPos}
-      colorStops={DAY_COLORS}
+      colorStops={colorStops}
       ticks={DAILY_TICKS}
       majorTicks={DAILY_MAJOR_TICKS}
       labels={DAILY_LABELS}
@@ -132,6 +155,8 @@ export const DailyClock: React.FC<DailyClockProps> = ({ date, sunrise, sunset })
       iconOffset={30}
       innerCircleRadius={33}
       idPrefix="daily"
+      activeIconIndex={activeIconIndex}
+      onIconClick={onIconClick}
     />
   );
 };

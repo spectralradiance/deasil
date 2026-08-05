@@ -37,7 +37,7 @@ export const darkTheme = createTheme({
       secondary: '#bdbdbd',
     },
     primary: {
-      main: '#1565c0',
+      main: '#D4A017',
     },
     secondary: {
       main: '#ffd54f',
@@ -45,5 +45,21 @@ export const darkTheme = createTheme({
   },
   typography: {
     fontFamily: 'Baloo 2, Arial, Helvetica, sans-serif',
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          // text/outlined primary buttons stay gold; lighter gold on hover
+          '&.MuiButton-textPrimary, &.MuiButton-outlinedPrimary': {
+            color: '#D4A017',
+          },
+          '&.MuiButton-textPrimary:hover, &.MuiButton-outlinedPrimary:hover': {
+            color: '#F0C848',
+            backgroundColor: 'rgba(212,160,23,0.10)',
+          },
+        },
+      },
+    },
   },
 });

@@ -47,8 +47,10 @@ export interface RingIcon {
 }
 
 export interface RadialClockProps {
-  /** Current position of the hand, 0–1 fraction of the full cycle */
-  handPos: number;
+  /** Current position of the hand, 0–1 fraction of the full cycle.
+   *  Omit to hide the hand entirely.
+   */
+  handPos?: number;
 
   /** Color stops that define the gradient ring.
    *  Positions should span 0–1; colors are linearly interpolated between stops.
@@ -200,9 +202,9 @@ export const RadialClock: React.FC<RadialClockProps> = ({
   // Number of gradient arc segments to draw (one per adjacent stop pair)
   const nSegments = colorStops.length;
 
-  // Hand color = gradient color at handPos
-  const handColor = interpolateColor(handPos, colorStops);
-  const handRad = posToRad(handPos, startAngleOffset);
+  // Hand color = gradient color at handPos (fallback unused when hand is hidden)
+  const handColor = handPos !== undefined ? interpolateColor(handPos, colorStops) : '#ffffff';
+  const handRad   = handPos !== undefined ? posToRad(handPos, startAngleOffset) : 0;
 
   return (
     <svg
@@ -360,17 +362,21 @@ export const RadialClock: React.FC<RadialClockProps> = ({
       {/* ── Custom children (e.g. moon phase disc) ── */}
       {children}
 
-      {/* ── Clock hand ── */}
-      <line
-        x1={cx}
-        y1={cy}
-        x2={cx + (R - ringWidth / 2 - 2) * Math.cos(handRad)}
-        y2={cy + (R - ringWidth / 2 - 2) * Math.sin(handRad)}
-        stroke={handColor}
-        strokeWidth={2.5}
-        strokeLinecap="round"
-      />
-      <circle cx={cx} cy={cy} r={3} fill="currentColor" />
+      {/* ── Clock hand (omitted when handPos is undefined) ── */}
+      {handPos !== undefined && (
+        <>
+          <line
+            x1={cx}
+            y1={cy}
+            x2={cx + (R - ringWidth / 2 - 2) * Math.cos(handRad)}
+            y2={cy + (R - ringWidth / 2 - 2) * Math.sin(handRad)}
+            stroke={handColor}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
+          <circle cx={cx} cy={cy} r={3} fill="currentColor" />
+        </>
+      )}
 
       {/* ── Icons outside the ring ── */}
       {icons.map((ic, i) => {
