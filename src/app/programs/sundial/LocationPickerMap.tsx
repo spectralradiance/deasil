@@ -7,17 +7,19 @@ import ZoomOutIcon     from '@mui/icons-material/ZoomOut';
 import FitScreenIcon   from '@mui/icons-material/FitScreen';
 import MyLocationIcon  from '@mui/icons-material/MyLocation';
 
-// Coordinate system matches the fla-shop equirectangular SVG (viewBox 0 0 2000 1280)
+// Coordinate system: the world SVG uses a square lat/lon scale (2000 units per axis)
+// but only the top 1280 y-units are visible in the viewBox (90°N → ~25°S).
 const W = 2000;
-const H = 1280;
+const H = 1280;      // SVG viewBox height (visible window)
+const MAP_H = 2000;  // full lat extent of the map paths (2000 units = 180°)
 
 function geoToSvg(lon: number, lat: number): [number, number] {
-  return [(lon + 180) / 360 * W, (90 - lat) / 180 * H];
+  return [(lon + 180) / 360 * W, (90 - lat) / 180 * MAP_H];
 }
 function svgToGeo(x: number, y: number): [number, number] {
   return [
     Math.max(-180, Math.min(180, x / W * 360 - 180)),
-    Math.max(-90,  Math.min(90,  90 - y / H * 180)),
+    Math.max(-90,  Math.min(90,  90 - y / MAP_H * 180)),
   ];
 }
 

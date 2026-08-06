@@ -22,6 +22,7 @@ const headingComponents = {
   h3: ({ children }: { children?: React.ReactNode }) => <h3 id={slugify(nodeText(children))}>{children}</h3>,
   h4: ({ children }: { children?: React.ReactNode }) => <h4 id={slugify(nodeText(children))}>{children}</h4>,
   h5: ({ children }: { children?: React.ReactNode }) => <h5 id={slugify(nodeText(children))}>{children}</h5>,
+  p:  ({ children }: { children?: React.ReactNode }) => <p style={{ marginBottom: '1em' }}>{children}</p>,
 };
 
 const builder = imageUrlBuilder(client);
