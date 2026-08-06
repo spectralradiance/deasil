@@ -15,6 +15,7 @@ type AlbumItem = {
   _id: string;
   _type: "folder" | "album";
   title: string;
+  slug: string;
   photoCount: number | null;
   coverImage: SanityImageSource | null;
   coverSourceUrl: string | null;
@@ -24,6 +25,7 @@ type AlbumItem = {
 type FolderSection = {
   _id: string;
   title: string;
+  slug: string;
   children: AlbumItem[];
 };
 
@@ -52,10 +54,12 @@ export default function PhotosPage() {
           *[_type == "folder" && title in ["Animals", "Plants & Fungi", "Environment"]] {
             _id,
             title,
+            "slug": slug.current,
             "children": children[]->{
               _id,
               _type,
               title,
+              "slug": slug.current,
               "photoCount": count(photographs),
               "coverImage": coalesce(photographs[0]->image, children[0]->photographs[0]->image),
               "coverSourceUrl": coalesce(photographs[0]->sourceUrl, children[0]->photographs[0]->sourceUrl),
@@ -100,9 +104,7 @@ export default function PhotosPage() {
           >
             {folder.children?.map((item) => {
               const coverUrl = getCoverUrl(item);
-              const href = item._type === "folder"
-                ? `/photos/folder/${item._id}`
-                : `/photos/${item._id}`;
+              const href = `/photos/${item.slug}`;
               return (
                 <Link key={item._id} href={href} style={{ textDecoration: "none", color: "inherit" }}>
                   <div

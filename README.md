@@ -38,6 +38,9 @@ show hamburger menu on each page, expand to show icons
 
 ### Todo
 
+- on the main photos page, can you show the 6 most recent photos
+- group by location
+
 ## Programs
 
 ### Sundial
