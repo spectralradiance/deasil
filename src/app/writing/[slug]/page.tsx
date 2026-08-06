@@ -10,6 +10,20 @@ import { portableTextToMarkdown } from '@portabletext/markdown';
 import Link from "next/link";
 import TableOfContents from './TableOfContents';
 
+const slugify = (text: string) =>
+  text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+
+// extract plain text from ReactMarkdown children to build matching heading ids
+const nodeText = (children: React.ReactNode): string =>
+  React.Children.toArray(children).map(c => (typeof c === 'string' ? c : '')).join('');
+
+const headingComponents = {
+  h2: ({ children }: { children?: React.ReactNode }) => <h2 id={slugify(nodeText(children))}>{children}</h2>,
+  h3: ({ children }: { children?: React.ReactNode }) => <h3 id={slugify(nodeText(children))}>{children}</h3>,
+  h4: ({ children }: { children?: React.ReactNode }) => <h4 id={slugify(nodeText(children))}>{children}</h4>,
+  h5: ({ children }: { children?: React.ReactNode }) => <h5 id={slugify(nodeText(children))}>{children}</h5>,
+};
+
 const builder = imageUrlBuilder(client);
 
 function urlFor(source: any) {
@@ -77,9 +91,9 @@ export default function ArticleDetailPage() {
   if (!article) return <Box sx={{ p: 4 }}>Article not found.</Box>;
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', p: 4 }}>
+    <Box sx={{ p: 4 }}>
       {article.body && <TableOfContents body={article.body} />}
-      <Box sx={{ flexGrow: 1, maxWidth: 700, mx: "auto", px: 2 }}>
+      <Box sx={{ maxWidth: 700, mx: "auto", px: 2 }}>
         <Typography gutterBottom variant="h2" component="div">
           {article.title}
         </Typography>
@@ -128,7 +142,7 @@ export default function ArticleDetailPage() {
           </Card>
         )}
         {article.body && (
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={headingComponents as any}>
             {portableTextToMarkdown(article.body)}
           </ReactMarkdown>
         )}

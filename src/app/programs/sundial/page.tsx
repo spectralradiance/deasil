@@ -159,6 +159,7 @@ export default function SundialPage() {
       <h1>Sundial</h1>
 
       {/* ── Live timestamp + controls ── */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
         <Typography variant="h3" component="div" sx={{ display: 'flex', alignItems: 'baseline', gap: '0.15em' }}>
           <span style={{ display: 'inline-block', width: '4ch', textAlign: 'center' }}>{year}</span>
@@ -190,18 +191,28 @@ export default function SundialPage() {
           >
             <CalendarMonthIcon />
           </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => {
-              setLatInput(coords ? coords.lat.toString() : '');
-              setLonInput(coords ? coords.lon.toString() : '');
-              setLocationOpen(true);
-            }}
-            title="Set location"
-          >
-            <MyLocationIcon />
-          </IconButton>
         </Box>
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Typography variant="body2" color="text.secondary">
+          {coords ? coords.lat.toFixed(6) : '—'}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ opacity: 0.4 }}>|</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {coords ? coords.lon.toFixed(6) : '—'}
+        </Typography>
+        <IconButton
+          size="small"
+          onClick={() => {
+            setLatInput(coords ? coords.lat.toString() : '');
+            setLonInput(coords ? coords.lon.toString() : '');
+            setLocationOpen(true);
+          }}
+          title="Set location"
+        >
+          <MyLocationIcon fontSize="small" />
+        </IconButton>
+      </Box>
       </Box>
 
       {/* ── Date/time picker dialog — StaticDateTimePicker renders inline, no secondary popup ── */}

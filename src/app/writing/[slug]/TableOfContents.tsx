@@ -45,7 +45,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
   };
 
   return (
-    <Box sx={{ position: 'sticky', top: 100, width: expanded ? 200 : 56, zIndex: 1000, transition: 'width 0.3s ease-in-out', alignSelf: 'flex-start' }}>
+    <Box sx={{ position: 'fixed', right: 'calc(50vw + 350px + 16px)', top: 100, width: expanded ? 200 : 40, zIndex: 1000, transition: 'width 0.3s ease-in-out', textAlign: 'right' }}>
       <Accordion expanded={expanded} onChange={() => setExpanded(!expanded)} sx={{ boxShadow: 'none', backgroundColor: 'transparent', bacjkground: 'transparent', border: 'none' }}>
         <AccordionSummary
           aria-controls="panel1a-content"
@@ -59,7 +59,8 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
               const text = getHeadingText(heading);
               const id = slugify(text);
               const style = {
-                paddingLeft: heading.style === 'h3' ? 2 : (heading.style === 'h4' ? 4 : 0)
+                paddingLeft: 0,
+                paddingRight: heading.style === 'h3' ? 2 : (heading.style === 'h4' ? 4 : 0),
               };
               return (
                 <ListItem key={heading._key} sx={style}>
