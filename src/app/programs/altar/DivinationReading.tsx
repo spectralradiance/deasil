@@ -5,6 +5,7 @@ import {
   IconButton, InputLabel, MenuItem, Select, Switch, Typography,
 } from '@mui/material';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
+import SymbolBrowser, { type SymbolGroup } from './SymbolBrowser';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -114,14 +115,16 @@ function TokenCard({
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
-  label: string;           // "Runes" | "Ogham"
+  label: string;
   tokens: DivinationToken[];
   spreads: DrawSpread[];
-  canReverse?: boolean;    // whether the system supports reversals
-  accentColor?: string;    // color for the symbol display
+  canReverse?: boolean;
+  systemSelector?: React.ReactNode;
+  browseGroups?: SymbolGroup[];
 }
 
-export default function DivinationReading({ label, tokens, spreads, canReverse = false, accentColor }: Props) {
+export default function DivinationReading({ label, tokens, spreads, canReverse = false, systemSelector, browseGroups }: Props) {
+  const [browseOpen, setBrowseOpen] = useState(false);
   const [selectedSpread, setSelectedSpread] = useState(spreads[0]);
   const [allowReversals, setAllowReversals]  = useState(canReverse);
   const [drawn, setDrawn]                    = useState<DrawnToken[]>([]);
@@ -190,6 +193,7 @@ export default function DivinationReading({ label, tokens, spreads, canReverse =
         {/* ── Controls ── */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', justifyContent: 'center', mb: 3 }}>
           <Typography variant="h4">{label}</Typography>
+          {systemSelector}
 
           <FormControl sx={{ minWidth: 180 }} disabled={drawn.length > 0 || isClearing}>
             <InputLabel>Spread</InputLabel>
@@ -217,18 +221,28 @@ export default function DivinationReading({ label, tokens, spreads, canReverse =
                   Clear
                 </Box>
               </Box>
-            : <Box component="button" onClick={draw} disabled={isClearing}
+            : <Box component="button" onClick={() => { setBrowseOpen(false); draw(); }} disabled={isClearing}
                 sx={{ px: 2, py: 0.75, borderRadius: 1, border: '1px solid', borderColor: 'primary.main', bgcolor: 'transparent', color: 'primary.main', cursor: 'pointer', '&:hover': { color: 'primary.light', borderColor: 'primary.light' } }}>
                 Draw
               </Box>
           }
+          {browseGroups && (
+            <Box component="button" onClick={() => setBrowseOpen(b => !b)}
+              sx={{ px: 2, py: 0.75, borderRadius: 1, border: 'none', bgcolor: 'transparent',
+                    color: browseOpen ? 'primary.main' : 'inherit', cursor: 'pointer',
+                    '&:hover': { color: 'primary.light' } }}>
+              Browse
+            </Box>
+          )}
         </Box>
 
-        {/* ── Token grid ── */}
-        <Box sx={{
-          display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'center',
-          opacity: visible ? 1 : 0, transition: `opacity ${FADE_MS}ms ease`,
-        }}>
+        {/* ── Token grid or browser ── */}
+        {browseOpen && browseGroups
+          ? <SymbolBrowser groups={browseGroups} />
+          : <Box sx={{
+              display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'center',
+              opacity: visible ? 1 : 0, transition: `opacity ${FADE_MS}ms ease`,
+            }}>
           {drawn.map((token, i) => (
             <TokenCard
               key={i}
@@ -240,6 +254,7 @@ export default function DivinationReading({ label, tokens, spreads, canReverse =
             />
           ))}
         </Box>
+        }
       </Box>
     </Container>
   );

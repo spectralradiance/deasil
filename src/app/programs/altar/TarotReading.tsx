@@ -11,7 +11,7 @@ import CardItem from './CardItem';
 import CardModal from './CardModal';
 import CardBrowser from './CardBrowser';
 
-export default function TarotReading() {
+export default function TarotReading({ systemSelector }: { systemSelector?: React.ReactNode }) {
   // ── State ─────────────────────────────────────────────────────────────────
 
   const [drawnCards, setDrawnCards] = useState<DrawnCard[]>([]);
@@ -209,6 +209,7 @@ export default function TarotReading() {
           onClear={clearCards}
           onBrowse={() => setBrowseOpen(b => !b)}
           browseOpen={browseOpen}
+          systemSelector={systemSelector}
         />
 
         {/* ── Card layout ───────────────────────────────────────────────── */}

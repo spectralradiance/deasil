@@ -25,6 +25,7 @@ interface SpreadControlsProps {
   onClear: () => void;
   onBrowse: () => void;
   browseOpen: boolean;
+  systemSelector?: React.ReactNode;
 }
 
 /**
@@ -53,6 +54,7 @@ export default function SpreadControls({
   onClear,
   onBrowse,
   browseOpen,
+  systemSelector,
 }: SpreadControlsProps) {
   // Controls are locked once cards are on the table or during the clear animation
   const locked = drawnCards.length > 0 || isClearing;
@@ -71,6 +73,7 @@ export default function SpreadControls({
         }}
       >
         <Typography variant="h4">Altar</Typography>
+        {systemSelector}
 
         {/* Spread type selector */}
         <FormControl sx={{ minWidth: 220 }} disabled={locked}>
