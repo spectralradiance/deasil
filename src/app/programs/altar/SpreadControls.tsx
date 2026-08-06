@@ -23,6 +23,8 @@ interface SpreadControlsProps {
   isClearing: boolean;
   onDraw: () => void;
   onClear: () => void;
+  onBrowse: () => void;
+  browseOpen: boolean;
 }
 
 /**
@@ -49,6 +51,8 @@ export default function SpreadControls({
   isClearing,
   onDraw,
   onClear,
+  onBrowse,
+  browseOpen,
 }: SpreadControlsProps) {
   // Controls are locked once cards are on the table or during the clear animation
   const locked = drawnCards.length > 0 || isClearing;
@@ -113,8 +117,9 @@ export default function SpreadControls({
         {/* Draw / Clear — mutually exclusive based on whether cards are showing */}
         {drawnCards.length > 0
           ? <Button variant="outlined" onClick={onClear} disabled={isClearing}>Clear</Button>
-          : <Button variant="contained" onClick={onDraw} disabled={isClearing}>Draw</Button>
+          : <Button variant="outlined" onClick={onDraw} disabled={isClearing}>Draw</Button>
         }
+        <Button variant="text" onClick={onBrowse} color={browseOpen ? 'primary' : 'inherit'}>Browse</Button>
       </Box>
 
       {/* ── Custom positions textarea ─────────────────────────────────────── */}

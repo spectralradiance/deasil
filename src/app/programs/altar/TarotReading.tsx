@@ -9,6 +9,7 @@ import {
 import SpreadControls from './SpreadControls';
 import CardItem from './CardItem';
 import CardModal from './CardModal';
+import CardBrowser from './CardBrowser';
 
 export default function TarotReading() {
   // ── State ─────────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ export default function TarotReading() {
   const [cardsVisible, setCardsVisible] = useState(false);
   /** True while the clear fade-out animation is running (prevents re-drawing) */
   const [isClearing, setIsClearing] = useState(false);
+  const [browseOpen, setBrowseOpen] = useState(false);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
 
@@ -57,6 +59,7 @@ export default function TarotReading() {
   /** Randomly draws `count` unique cards from the deck, then fades them in */
   const drawCards = () => {
     if (isClearing) return;
+    setBrowseOpen(false);
 
     // Cancel any in-flight timers from a previous draw/clear cycle
     if (clearTimerRef.current !== null) {
@@ -204,10 +207,14 @@ export default function TarotReading() {
           isClearing={isClearing}
           onDraw={drawCards}
           onClear={clearCards}
+          onBrowse={() => setBrowseOpen(b => !b)}
+          browseOpen={browseOpen}
         />
 
         {/* ── Card layout ───────────────────────────────────────────────── */}
-        {selectedSpread.layout && !isMobile ? (
+        {browseOpen ? (
+          <CardBrowser />
+        ) : selectedSpread.layout && !isMobile ? (
           /*
            * Positioned layout mode — for spreads that define a 2-D grid
            * (e.g. Celtic Cross, Four Elements). Cards are placed at specific
