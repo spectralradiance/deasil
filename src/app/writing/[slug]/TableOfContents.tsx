@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Box, List, ListItem, ListItemText, IconButton,
+  Box, Collapse, List, ListItem, ListItemText, IconButton,
   Dialog, DialogTitle, DialogContent, useMediaQuery, useTheme,
 } from '@mui/material';
 import TocIcon from '@mui/icons-material/Toc';
@@ -108,7 +108,11 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
             <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%', gap: 0.5 }}>
               <a
                 href={`#${chapter.id}`}
-                onClick={(e) => handleScroll(e, chapter.id)}
+                onClick={(e) => {
+                  handleScroll(e, chapter.id);
+                  if (chapter.subheadings.length > 0)
+                    setExpandedChapters((prev) => new Set(prev).add(chapter.id));
+                }}
                 onMouseEnter={() => setHoveredId(chapter.id)}
                 onMouseLeave={() => setHoveredId(null)}
                 style={{ textDecoration: 'none', color: linkColor(chapter.id), transition: 'color 0.15s', flex: 1 }}
@@ -128,23 +132,25 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
               )}
             </Box>
           </ListItem>
-          {expandedChapters.has(chapter.id) && chapter.subheadings.map((sub) => (
-            <ListItem
-              key={sub.heading._key}
-              disablePadding
-              sx={{ pl: sub.heading.style === 'h4' ? 4 : 2 }}
-            >
-              <a
-                href={`#${sub.id}`}
-                onClick={(e) => handleScroll(e, sub.id)}
-                onMouseEnter={() => setHoveredId(sub.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                style={{ textDecoration: 'none', color: linkColor(sub.id), transition: 'color 0.15s' }}
+          <Collapse in={expandedChapters.has(chapter.id)} timeout={250} unmountOnExit>
+            {chapter.subheadings.map((sub) => (
+              <ListItem
+                key={sub.heading._key}
+                disablePadding
+                sx={{ pl: sub.heading.style === 'h4' ? 4 : 2 }}
               >
-                <ListItemText primary={sub.text} />
-              </a>
-            </ListItem>
-          ))}
+                <a
+                  href={`#${sub.id}`}
+                  onClick={(e) => handleScroll(e, sub.id)}
+                  onMouseEnter={() => setHoveredId(sub.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  style={{ textDecoration: 'none', color: linkColor(sub.id), transition: 'color 0.15s' }}
+                >
+                  <ListItemText primary={sub.text} />
+                </a>
+              </ListItem>
+            ))}
+          </Collapse>
         </React.Fragment>
       ))}
     </List>
@@ -156,7 +162,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
         <IconButton
           onClick={() => setModalOpen(true)}
           title="Show contents"
-          sx={{ position: 'fixed', top: 8, right: 8, zIndex: 1201 }}
+          sx={{ position: 'fixed', top: 64, right: 8, zIndex: 1201 }}
         >
           <TocIcon />
         </IconButton>
