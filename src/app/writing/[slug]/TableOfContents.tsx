@@ -1,10 +1,10 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
   Box, Collapse, List, ListItem, ListItemText, IconButton,
   Dialog, DialogTitle, DialogContent, useMediaQuery, useTheme,
 } from '@mui/material';
-import TocIcon from '@mui/icons-material/Toc';
+import { TocContext } from '../../TocContext';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CloseIcon from '@mui/icons-material/Close';
@@ -22,8 +22,8 @@ interface TableOfContentsProps {
 const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
   const [headings, setHeadings] = useState<Heading[]>([]);
   const [panelOpen, setPanelOpen] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
+  const { tocOpen, setTocOpen, setHasToc } = useContext(TocContext);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -41,6 +41,11 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
   useEffect(() => () => {
     if (activeTimerRef.current) clearTimeout(activeTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    setHasToc(true);
+    return () => setHasToc(false);
+  }, [setHasToc]);
 
   const getHeadingText = (heading: Heading) => heading.children.map((c) => c.text).join('');
   const slugify = (text: string) => text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
@@ -69,7 +74,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
     setActiveId(id);
     activeTimerRef.current = setTimeout(() => setActiveId(null), 1000);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-    if (isMobile) setModalOpen(false);
+    if (isMobile) setTocOpen(false);
   };
 
   const toggleChapter = (id: string) => {
@@ -158,29 +163,20 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
 
   if (isMobile) {
     return (
-      <>
-        <IconButton
-          onClick={() => setModalOpen(true)}
-          title="Show contents"
-          sx={{ position: 'fixed', top: 64, right: 8, zIndex: 1201 }}
-        >
-          <TocIcon />
-        </IconButton>
-        <Dialog open={modalOpen} onClose={() => setModalOpen(false)} fullWidth maxWidth="sm">
-          <DialogTitle sx={{ pr: 6 }}>
-            Contents
-            <IconButton
-              onClick={() => setModalOpen(false)}
-              sx={{ position: 'absolute', right: 8, top: 8 }}
-            >
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent>
-            {tocList()}
-          </DialogContent>
-        </Dialog>
-      </>
+      <Dialog open={tocOpen} onClose={() => setTocOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ pr: 6 }}>
+          Contents
+          <IconButton
+            onClick={() => setTocOpen(false)}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {tocList()}
+        </DialogContent>
+      </Dialog>
     );
   }
 

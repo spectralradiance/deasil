@@ -9,6 +9,7 @@ import CssBaseline from "@mui/material/CssBaseline";
 import { lightTheme, darkTheme } from "./theme";
 
 import AppBar from './AppBar';
+import { TocContext } from './TocContext';
 
 const baloo2 = Baloo_2({
   weight: ['400'],
@@ -41,6 +42,8 @@ export default function RootLayout({
 
   // On first mount, sync mode with localStorage, CSS variable, or system preference
   const [mode, setMode] = React.useState<'light' | 'dark' | null>(null);
+  const [tocOpen, setTocOpen] = React.useState(false);
+  const [hasToc, setHasToc] = React.useState(false);
 
   // On mount, determine mode from localStorage or system preference
   React.useEffect(() => {
@@ -81,13 +84,15 @@ export default function RootLayout({
         <link rel="icon" href="/favicons/favicon.ico" />
       </head>
       <body className={comfortaa.variable} suppressHydrationWarning>
-        <ThemeModeContext.Provider value={{ mode, setMode }}>
+        <TocContext.Provider value={{ tocOpen, setTocOpen, hasToc, setHasToc }}>
+          <ThemeModeContext.Provider value={{ mode, setMode }}>
           <ThemeProvider theme={mode === 'dark' ? darkTheme : lightTheme}>
             <CssBaseline />
             <AppBar />
             {children}
           </ThemeProvider>
-        </ThemeModeContext.Provider>
+          </ThemeModeContext.Provider>
+        </TocContext.Provider>
       </body>
     </html>
   );

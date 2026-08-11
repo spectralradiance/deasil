@@ -45,6 +45,8 @@ show hamburger menu on each page, expand to show icons
 
 ### Sundial
 
+- add/remove clocks
+
 #### Features
 
 - Sun clock - time of day
@@ -109,7 +111,9 @@ show hamburger menu on each page, expand to show icons
     - [Kaggle - Tarot Deck](https://www.kaggle.com/datasets/lsind18/tarot-json/data)
     - [Kaggle - Tarotoo Tarot Card Meanings](https://www.kaggle.com/datasets/tarotoo/tarotoo-tarot-card-meanings)
     - Not used: [Kaggle - Complete Tarot Card Meanings](https://www.kaggle.com/datasets/morrispoint/complete-tarot-card-meanings-all-78-cards), scraped from [here?](https://deckaura.com/blogs/guide/fool-tarot-meaning)
-
+- add/remove spreads, have close button next to each reading, have browse visible by default
+- uniform design between tarot and runes
+- have reversals off by default
 
 
 ### Glyph
