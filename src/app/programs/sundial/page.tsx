@@ -14,7 +14,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { StaticDateTimePicker } from '@mui/x-date-pickers/StaticDateTimePicker';
-import { Box, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
+import { Box, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Autocomplete } from '@mui/material';
 
 // SSR-safe: mapbox-gl uses browser globals
 const LocationPickerMap = dynamic(() => import('./LocationPickerMap'), { ssr: false });
@@ -22,12 +22,12 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import { DailyClock, SOLAR_EVENT_DATA } from './DailyClock';
 import { MoonClock, MOON_PHASE_DATA }  from './MoonClock';
 import { YearClock, SABBAT_DATA, dayOfYearToFraction } from './YearClock';
 import { AstroClock, ZODIAC_DATA, PlanetaryPositionsTable, ElementModalitySummary, AspectsTable } from './AstroClock';
+import tzlookup from 'tz-lookup';
 import {
   calcSunTimes,
   formatSunTime,
@@ -77,6 +77,32 @@ const infoPanelContentSx = (open: boolean) => ({
   transition: 'transform 0.45s cubic-bezier(0.4,0,0.2,1), opacity 0.3s cubic-bezier(0.4,0,0.2,1)',
 });
 
+function getUtcOffset(tz: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(new Date());
+    return (parts.find(p => p.type === 'timeZoneName')?.value ?? '').replace('GMT', 'UTC');
+  } catch { return ''; }
+}
+
+// Uses January to get the standard (non-DST) offset, matching the zone boundary data
+function getStandardUtcOffset(tz: string): string {
+  try {
+    const jan = new Date(new Date().getFullYear(), 0, 15);
+    const parts = new Intl.DateTimeFormat('en', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(jan);
+    return (parts.find(p => p.type === 'timeZoneName')?.value ?? '').replace('GMT', 'UTC');
+  } catch { return ''; }
+}
+
+// geo-tz runs server-side via /api/timezone; tz-lookup handles most locations instantly
+async function lookupTimezone(lat: number, lon: number): Promise<string> {
+  try { const tz = tzlookup(lat, lon); if (tz) return tz; } catch {}
+  try {
+    const res = await fetch(`/api/timezone?lat=${lat}&lon=${lon}`);
+    if (res.ok) { const d = await res.json(); if (d.timezone) return d.timezone; }
+  } catch {}
+  return '';
+}
+
 // ---- Page ---------------------------------------------------
 
 export default function SundialPage() {
@@ -89,6 +115,10 @@ export default function SundialPage() {
   const [pickedDayjs, setPickedDayjs]   = useState<Dayjs | null>(null);
   const [latInput, setLatInput]         = useState('');
   const [lonInput, setLonInput]         = useState('');
+  const [timezone, setTimezone]         = useState('');
+  const [modalTimezone, setModalTimezone] = useState('');
+  const [use24h, setUse24h]             = useState(false);
+  const [useDMY, setUseDMY]             = useState(false);
 
   // Tracks which icon the user last clicked; null = follow the live current position
   const [dailySelectedIdx, setDailySelectedIdx] = useState<number | null>(null);
@@ -101,6 +131,43 @@ export default function SundialPage() {
   const [moonInfoOpen, setMoonInfoOpen]   = useState(false);
   const [yearInfoOpen, setYearInfoOpen]   = useState(false);
   const [astroInfoOpen, setAstroInfoOpen] = useState(false);
+  const modalTzReqRef = React.useRef(0);
+
+  // Load persisted coords immediately; geolocation will overwrite with live position
+  useEffect(() => {
+    const stored = localStorage.getItem('sundial-coords');
+    if (stored) {
+      try {
+        const { lat, lon, tz } = JSON.parse(stored);
+        setCoords({ lat, lon });
+        if (tz) setTimezone(tz);
+      } catch {}
+    }
+    if (localStorage.getItem('sundial-24h') === 'true') setUse24h(true);
+    if (localStorage.getItem('sundial-dmy') === 'true') setUseDMY(true);
+  }, []);
+
+  useEffect(() => {
+    if (coords) {
+      (async () => {
+        const tz = timezone || await lookupTimezone(coords.lat, coords.lon);
+        localStorage.setItem('sundial-coords', JSON.stringify({ ...coords, tz }));
+      })();
+    }
+  }, [coords, timezone]);
+
+  // Re-lookup timezone when coordinates are typed directly into the inputs
+  useEffect(() => {
+    if (!locationOpen) return;
+    const lat = parseFloat(latInput);
+    const lon = parseFloat(lonInput);
+    if (isNaN(lat) || isNaN(lon)) return;
+    const t = setTimeout(() => {
+      const reqId = ++modalTzReqRef.current; // increment inside timeout so map-click direct calls aren't invalidated
+      lookupTimezone(lat, lon).then(tz => { if (tz && modalTzReqRef.current === reqId) setModalTimezone(tz); });
+    }, 600);
+    return () => clearTimeout(t);
+  }, [latInput, lonInput, locationOpen]);
 
   // Tick every millisecond for smooth hand movement; stops when paused
   useEffect(() => {
@@ -113,19 +180,25 @@ export default function SundialPage() {
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        pos => setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        pos => {
+          const { latitude: lat, longitude: lon } = pos.coords;
+          setCoords({ lat, lon });
+          lookupTimezone(lat, lon).then(tz => { if (tz) setTimezone(tz); });
+        },
         () => {},
       );
     }
   }, []);
 
   const { year, month, day, hours, minutes, seconds, milliseconds } = formatTime(time);
+  const displayHours = use24h ? hours : ((time.getHours() % 12) || 12).toString().padStart(2, '0');
+  const ampm = use24h ? null : (time.getHours() >= 12 ? 'PM' : 'AM');
 
   // Recompute sun times only when the date or location changes (not every ms)
   const sunTimes = useMemo(
     () => coords
       ? calcSunTimes(time, coords.lat, coords.lon)
-      : { sunrise: null, sunset: null },
+      : { sunrise: null, sunset: null, solarNoon: null, solarMidnight: null },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [coords, year, month, day],
   );
@@ -154,6 +227,13 @@ export default function SundialPage() {
   const yearDisplayIdx  = yearSelectedIdx  ?? yearCurrentIdx;
   const astroDisplayIdx = astroSelectedIdx ?? astroCurrentIdx;
 
+  // Pre-compute timezone option list once; labels use standard offset to match zone boundary highlights
+  const allTimezones = useMemo(() => {
+    try {
+      return (Intl as any).supportedValuesOf('timeZone').map((tz: string) => ({ tz, label: `${getStandardUtcOffset(tz)}  ${tz}` }));
+    } catch { return []; }
+  }, []);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 4, gap: 6 }}>
       <h1>Sundial</h1>
@@ -164,17 +244,18 @@ export default function SundialPage() {
         <Typography variant="h3" component="div" sx={{ display: 'flex', alignItems: 'baseline', gap: '0.15em' }}>
           <span style={{ display: 'inline-block', width: '4ch', textAlign: 'center' }}>{year}</span>
           <span>:</span>
-          <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{month}</span>
+          <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{useDMY ? day : month}</span>
           <span>:</span>
-          <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{day}</span>
+          <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{useDMY ? month : day}</span>
           <span>  </span>
-          <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{hours}</span>
+          <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{displayHours}</span>
           <span>:</span>
           <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{minutes}</span>
           <span>:</span>
           <span style={{ display: 'inline-block', width: '2ch', textAlign: 'center' }}>{seconds}</span>
           <span>:</span>
           <span style={{ display: 'inline-block', width: '3ch', textAlign: 'center' }}>{milliseconds}</span>
+          {ampm && <span style={{ fontSize: '0.55em', marginLeft: '0.3em' }}>{ampm}</span>}
         </Typography>
         <Box sx={{ display: 'flex', gap: 0.5, ml: 1 }}>
           <IconButton
@@ -191,21 +272,34 @@ export default function SundialPage() {
           >
             <CalendarMonthIcon />
           </IconButton>
+          <Button size="small" onClick={() => { const v = !use24h; setUse24h(v); localStorage.setItem('sundial-24h', String(v)); }}
+            sx={{ minWidth: 0, px: 1, textTransform: 'none', fontSize: '0.75rem' }}>
+            {use24h ? '24h' : '12h'}
+          </Button>
+          <Button size="small" onClick={() => { const v = !useDMY; setUseDMY(v); localStorage.setItem('sundial-dmy', String(v)); }}
+            sx={{ minWidth: 0, px: 1, textTransform: 'none', fontSize: '0.75rem' }}>
+            {useDMY ? 'D/M' : 'M/D'}
+          </Button>
         </Box>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <Typography variant="body2" color="text.secondary">
-          {coords ? coords.lat.toFixed(6) : '—'}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ opacity: 0.4 }}>|</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {coords ? coords.lon.toFixed(6) : '—'}
-        </Typography>
+        {coords ? (
+          <Typography variant="h3" component="div">
+            {coords.lat.toFixed(6)}&nbsp;&nbsp;{coords.lon.toFixed(6)}
+            {timezone && <>&nbsp;&nbsp;<span>{getUtcOffset(timezone)}</span></>}
+          </Typography>
+        ) : (
+          <Typography variant="h3" component="div" color="text.secondary">
+            {'< Getting Location >'}
+          </Typography>
+        )}
         <IconButton
           size="small"
-          onClick={() => {
+          onClick={async () => {
             setLatInput(coords ? coords.lat.toString() : '');
             setLonInput(coords ? coords.lon.toString() : '');
+            const tz = timezone || (coords ? await lookupTimezone(coords.lat, coords.lon) : '');
+            setModalTimezone(tz);
             setLocationOpen(true);
           }}
           title="Set location"
@@ -223,7 +317,7 @@ export default function SundialPage() {
             value={pickedDayjs}
             onChange={setPickedDayjs}
             onAccept={(val) => {
-              if (val) { setTime(val.toDate()); setPaused(true); }
+              if (val) { setTime(val.second(0).millisecond(0).toDate()); setPaused(true); }
               setCalendarOpen(false);
             }}
             onClose={() => setCalendarOpen(false)}
@@ -233,15 +327,20 @@ export default function SundialPage() {
       </Dialog>
 
       {/* ── Location picker dialog ── */}
-      <Dialog open={locationOpen} onClose={() => setLocationOpen(false)} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { bgcolor: '#1a1a1a', backgroundImage: 'none' } }}>
+      <Dialog open={locationOpen} onClose={() => setLocationOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Set location</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
           {locationOpen && (
             <LocationPickerMap
               lat={isNaN(parseFloat(latInput)) ? (coords?.lat ?? 0) : parseFloat(latInput)}
               lon={isNaN(parseFloat(lonInput)) ? (coords?.lon ?? 0) : parseFloat(lonInput)}
-              onChange={(lat, lon) => { setLatInput(lat.toFixed(6)); setLonInput(lon.toFixed(6)); }}
+              onChange={(lat, lon) => {
+                setLatInput(lat.toFixed(6));
+                setLonInput(lon.toFixed(6));
+
+                const reqId = ++modalTzReqRef.current;
+                lookupTimezone(lat, lon).then(tz => { if (tz && modalTzReqRef.current === reqId) setModalTimezone(tz); });
+              }}
             />
           )}
           <Box sx={{ display: 'flex', gap: 2 }}>
@@ -262,15 +361,38 @@ export default function SundialPage() {
               fullWidth
             />
           </Box>
+          <Autocomplete
+            value={allTimezones.find((o: {tz: string}) => o.tz === modalTimezone)
+              ?? (modalTimezone ? { tz: modalTimezone, label: `${getStandardUtcOffset(modalTimezone)}  ${modalTimezone}` } : null)}
+            onChange={(_, v: {tz: string; label: string} | null) => { if (v) setModalTimezone(v.tz); }}
+            options={allTimezones}
+            getOptionLabel={(o: {tz: string; label: string}) => o.label}
+            renderInput={params => <TextField {...params} label="Timezone" size="small" />}
+            fullWidth
+            disableClearable
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setLocationOpen(false)}>Cancel</Button>
           <Button
             onClick={() => {
+              navigator.geolocation?.getCurrentPosition(
+                pos => { setLatInput(pos.coords.latitude.toFixed(6)); setLonInput(pos.coords.longitude.toFixed(6)); },
+                () => {},
+              );
+            }}
+            sx={{ mr: 'auto' }}
+          >
+            Current Location
+          </Button>
+          <Button onClick={() => setLocationOpen(false)}>Cancel</Button>
+          <Button
+            onClick={async () => {
               const lat = parseFloat(latInput);
               const lon = parseFloat(lonInput);
               if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
                 setCoords({ lat, lon });
+                const tz = modalTimezone || await lookupTimezone(lat, lon);
+                setTimezone(tz);
               }
               setLocationOpen(false);
             }}
@@ -282,40 +404,42 @@ export default function SundialPage() {
 
       {/* ── Daily (solar) clock ── */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, width: { xs: '100%', md: 'fit-content' } }}>
-        <Box sx={clockBoxSx(dailyInfoOpen)}>
+        <Box sx={clockBoxSx(dailyInfoOpen)} onClick={() => setDailyInfoOpen(true)} style={{ cursor: 'pointer' }}>
           <DailyClock
             date={time}
             sunrise={sunTimes.sunrise}
             sunset={sunTimes.sunset}
             activeIconIndex={dailySelectedIdx ?? undefined}
-            onIconClick={(i) => setDailySelectedIdx(prev => prev === i ? null : i)}
+            onIconClick={(i) => { setDailySelectedIdx(prev => prev === i ? null : i); setDailyInfoOpen(true); }}
           />
-          <IconButton
-            size="small"
-            onClick={() => setDailyInfoOpen(p => !p)}
-            title="Info"
-            sx={{ position: 'absolute', top: 4, right: 4, opacity: dailyInfoOpen ? 0 : 0.4, pointerEvents: dailyInfoOpen ? 'none' : 'auto', transition: 'opacity 0.25s' }}
-          >
-            <InfoOutlinedIcon fontSize="small" />
-          </IconButton>
         </Box>
         <Box sx={infoPanelSx(dailyInfoOpen)}>
           <Box sx={infoPanelContentSx(dailyInfoOpen)}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
-              <IconButton size="small" onClick={() => setDailyInfoOpen(false)} title="Close">
+              <IconButton size="small" onClick={() => { setDailyInfoOpen(false); setDailySelectedIdx(null); }} title="Close">
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Box>
             <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5 }}>Sun</Typography>
             <Typography variant="body2" sx={{ mb: 0.5 }}>{`${year}-${month}-${day}`}</Typography>
+            {sunTimes.solarNoon && (
+              <Typography variant="body2" sx={{ color: '#FFFFFF' }}>
+                ☀ {formatSunTime(sunTimes.solarNoon, use24h)}
+              </Typography>
+            )}
             {sunTimes.sunrise && (
               <Typography variant="body2" sx={{ color: '#FFD700' }}>
-                ↑ {formatSunTime(sunTimes.sunrise)}
+                ↑ {formatSunTime(sunTimes.sunrise, use24h)}
               </Typography>
             )}
             {sunTimes.sunset && (
               <Typography variant="body2" sx={{ color: '#FF8C00' }}>
-                ↓ {formatSunTime(sunTimes.sunset)}
+                ↓ {formatSunTime(sunTimes.sunset, use24h)}
+              </Typography>
+            )}
+            {sunTimes.solarMidnight && (
+              <Typography variant="body2" sx={{ color: '#8888FF' }}>
+                ☽ {formatSunTime(sunTimes.solarMidnight, use24h)}
               </Typography>
             )}
             {!coords && (
@@ -346,26 +470,18 @@ export default function SundialPage() {
 
       {/* ── Moon clock ── */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, width: { xs: '100%', md: 'fit-content' } }}>
-        <Box sx={clockBoxSx(moonInfoOpen)}>
+        <Box sx={clockBoxSx(moonInfoOpen)} onClick={() => setMoonInfoOpen(true)} style={{ cursor: 'pointer' }}>
           <MoonClock
             percent={moonPercent}
             date={time}
             activeIconIndex={moonDisplayIdx}
-            onIconClick={(i) => setMoonSelectedIdx(prev => prev === i ? null : i)}
+            onIconClick={(i) => { setMoonSelectedIdx(prev => prev === i ? null : i); setMoonInfoOpen(true); }}
           />
-          <IconButton
-            size="small"
-            onClick={() => setMoonInfoOpen(p => !p)}
-            title="Info"
-            sx={{ position: 'absolute', top: 4, right: 4, opacity: moonInfoOpen ? 0 : 0.4, pointerEvents: moonInfoOpen ? 'none' : 'auto', transition: 'opacity 0.25s' }}
-          >
-            <InfoOutlinedIcon fontSize="small" />
-          </IconButton>
         </Box>
         <Box sx={infoPanelSx(moonInfoOpen)}>
           <Box sx={infoPanelContentSx(moonInfoOpen)}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
-              <IconButton size="small" onClick={() => setMoonInfoOpen(false)} title="Close">
+              <IconButton size="small" onClick={() => { setMoonInfoOpen(false); setMoonSelectedIdx(null); }} title="Close">
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Box>
@@ -409,25 +525,17 @@ export default function SundialPage() {
 
       {/* ── Wheel of the Year clock ── */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, width: { xs: '100%', md: 'fit-content' } }}>
-        <Box sx={clockBoxSx(yearInfoOpen)}>
+        <Box sx={clockBoxSx(yearInfoOpen)} onClick={() => setYearInfoOpen(true)} style={{ cursor: 'pointer' }}>
           <YearClock
             date={time}
             activeIconIndex={yearDisplayIdx}
-            onIconClick={(i) => setYearSelectedIdx(prev => prev === i ? null : i)}
+            onIconClick={(i) => { setYearSelectedIdx(prev => prev === i ? null : i); setYearInfoOpen(true); }}
           />
-          <IconButton
-            size="small"
-            onClick={() => setYearInfoOpen(p => !p)}
-            title="Info"
-            sx={{ position: 'absolute', top: 4, right: 4, opacity: yearInfoOpen ? 0 : 0.4, pointerEvents: yearInfoOpen ? 'none' : 'auto', transition: 'opacity 0.25s' }}
-          >
-            <InfoOutlinedIcon fontSize="small" />
-          </IconButton>
         </Box>
         <Box sx={infoPanelSx(yearInfoOpen)}>
           <Box sx={infoPanelContentSx(yearInfoOpen)}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
-              <IconButton size="small" onClick={() => setYearInfoOpen(false)} title="Close">
+              <IconButton size="small" onClick={() => { setYearInfoOpen(false); setYearSelectedIdx(null); }} title="Close">
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Box>
@@ -469,25 +577,17 @@ export default function SundialPage() {
 
       {/* ── Astrological / zodiac clock ── */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, width: { xs: '100%', md: 'fit-content' } }}>
-        <Box sx={clockBoxSx(astroInfoOpen)}>
+        <Box sx={clockBoxSx(astroInfoOpen)} onClick={() => setAstroInfoOpen(true)} style={{ cursor: 'pointer' }}>
           <AstroClock
             date={time}
             activeIconIndex={astroDisplayIdx}
-            onSignClick={(i) => setAstroSelectedIdx(prev => prev === i ? null : i)}
+            onSignClick={(i) => { setAstroSelectedIdx(prev => prev === i ? null : i); setAstroInfoOpen(true); }}
           />
-          <IconButton
-            size="small"
-            onClick={() => setAstroInfoOpen(p => !p)}
-            title="Info"
-            sx={{ position: 'absolute', top: 4, right: 4, opacity: astroInfoOpen ? 0 : 0.4, pointerEvents: astroInfoOpen ? 'none' : 'auto', transition: 'opacity 0.25s' }}
-          >
-            <InfoOutlinedIcon fontSize="small" />
-          </IconButton>
         </Box>
         <Box sx={infoPanelSx(astroInfoOpen)}>
           <Box sx={infoPanelContentSx(astroInfoOpen)}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
-              <IconButton size="small" onClick={() => setAstroInfoOpen(false)} title="Close">
+              <IconButton size="small" onClick={() => { setAstroInfoOpen(false); setAstroSelectedIdx(null); }} title="Close">
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Box>

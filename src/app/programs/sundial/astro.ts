@@ -43,7 +43,7 @@ export function calcSunTimes(
   date: Date,
   lat: number,
   lon: number,
-): { sunrise: Date | null; sunset: Date | null } {
+): { sunrise: Date | null; sunset: Date | null; solarNoon: Date | null; solarMidnight: Date | null } {
   const JD = dateToJulian(date);
   const T  = (JD - 2451545.0) / 36525.0;
   const L0 = ((280.46646 + T * (36000.76983 + T * 0.0003032)) % 360 + 360) % 360;
@@ -68,7 +68,7 @@ export function calcSunTimes(
   );
   const cosHA = (Math.cos(toRad(90.833)) - Math.sin(toRad(lat)) * Math.sin(toRad(dec)))
               / (Math.cos(toRad(lat)) * Math.cos(toRad(dec)));
-  if (cosHA < -1 || cosHA > 1) return { sunrise: null, sunset: null };
+  if (cosHA < -1 || cosHA > 1) return { sunrise: null, sunset: null, solarNoon: null, solarMidnight: null };
   const HA   = toDeg(Math.acos(cosHA));
   const noon = 720 - 4 * lon - eot;
   const dayStart = new Date(date);
@@ -76,14 +76,19 @@ export function calcSunTimes(
   return {
     sunrise: new Date(dayStart.getTime() + (noon - HA * 4) * 60000),
     sunset:  new Date(dayStart.getTime() + (noon + HA * 4) * 60000),
+    solarNoon:     new Date(dayStart.getTime() + noon * 60000),
+    solarMidnight: new Date(dayStart.getTime() + (noon + 720) * 60000),
   };
 }
 
-/** Format a Date as 12-hour time string, e.g. "6:42 AM" */
-export function formatSunTime(date: Date): string {
-  const h = date.getHours();
-  const m = date.getMinutes().toString().padStart(2, '0');
-  return `${h % 12 || 12}:${m} ${h >= 12 ? 'PM' : 'AM'}`;
+/** Format a Date as 12-hour time with seconds and milliseconds, e.g. "6:42:07.312 AM" */
+export function formatSunTime(date: Date, use24h = false): string {
+  const h  = date.getHours();
+  const m  = date.getMinutes().toString().padStart(2, '0');
+  const s  = date.getSeconds().toString().padStart(2, '0');
+  const ms = date.getMilliseconds().toString().padStart(3, '0');
+  if (use24h) return `${h.toString().padStart(2, '0')}:${m}:${s}.${ms}`;
+  return `${h % 12 || 12}:${m}:${s}.${ms} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
 // --- Wheel of the Year (Sabbat) utilities ---
