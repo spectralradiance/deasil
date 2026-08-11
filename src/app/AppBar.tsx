@@ -14,6 +14,8 @@ import IconButton from '@mui/material/IconButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import MuiMenu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Slide from '@mui/material/Slide';
+import useScrollTrigger from '@mui/material/useScrollTrigger';
 import MenuIcon from '@mui/icons-material/Menu';
 import TocIcon from '@mui/icons-material/Toc';
 import LightMode from '@mui/icons-material/LightMode';
@@ -27,23 +29,6 @@ import ShellSvg from './ShellSvg';
 import Link from 'next/link';
 import { TocContext } from './TocContext';
 
-// Hides when scrolling down past threshold, reveals on any upward scroll
-function useScrollHide(threshold = 64) {
-  const [hidden, setHidden] = React.useState(false);
-  React.useEffect(() => {
-    let prevY = window.scrollY;
-    const handle = () => {
-      const y = window.scrollY;
-      if (y > prevY && y > threshold) setHidden(true);
-      else if (y < prevY) setHidden(false);
-      prevY = y;
-    };
-    window.addEventListener('scroll', handle, { passive: true });
-    return () => window.removeEventListener('scroll', handle);
-  }, [threshold]);
-  return hidden;
-}
-
 export default function AppBar() {
   const [logo, setLogo] = React.useState('shell');
   const [shareAnchor, setShareAnchor] = React.useState<null | HTMLElement>(null);
@@ -52,7 +37,7 @@ export default function AppBar() {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { mode, setMode } = useContext(ThemeModeContext);
   const { hasToc, setTocOpen } = useContext(TocContext);
-  const scrollHide = useScrollHide();
+  const trigger = useScrollTrigger();
 
   const handleThemeToggle = () => setMode(mode === 'light' ? 'dark' : 'light');
   const handleLogoToggle = () => setLogo(logo === 'sol' ? 'shell' : 'sol');
@@ -83,16 +68,10 @@ export default function AppBar() {
 
   return (
     <>
-      <Box sx={{
-        width: '100%', display: 'flex', justifyContent: 'center',
-        position: { xs: 'sticky', sm: 'static' },
-        top: 0,
-        zIndex: { xs: 1100, sm: 'auto' },
-        transform: isMobile && scrollHide ? 'translateY(-100%)' : 'translateY(0)',
-        transition: 'transform 0.3s ease',
-      }}>
+      <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
         <Box sx={{ width: '100%', maxWidth: 1200 }}>
-          <MuiAppBar position="static" sx={{ backgroundColor: 'transparent', boxShadow: 'none', borderBottom: '1px solid var(--foreground)' }}>
+          <Slide appear={false} direction="down" in={!isMobile || !trigger}>
+            <MuiAppBar position={isMobile ? 'fixed' : 'static'} sx={{ backgroundColor: 'background.default', boxShadow: 'none', borderBottom: '1px solid var(--foreground)' }}>
             <Toolbar>
               <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, fontFamily: 'Baloo 2, cursive', fontSize: { xs: '1.2rem', sm: '1.5rem', md: '1.8rem' } }}>
                 <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}>
@@ -133,7 +112,8 @@ export default function AppBar() {
                 </IconButton>
               )}
             </Toolbar>
-          </MuiAppBar>
+            </MuiAppBar>
+          </Slide>
 
           <MuiMenu anchorEl={navAnchor} open={Boolean(navAnchor)} onClose={() => setNavAnchor(null)}>
             {menuOptions.map((item) => (
@@ -161,6 +141,8 @@ export default function AppBar() {
           </MuiMenu>
         </Box>
       </Box>
+      {/* Spacer so content doesn't hide under the fixed AppBar on mobile */}
+      {isMobile && <Toolbar />}
     </>
   );
 }

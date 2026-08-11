@@ -106,7 +106,7 @@ export default function ArticleDetailPage() {
         <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
           {article.author && article.author.slug && (
             <Link href={`/writing/author/${article.author.slug.current}`} passHref>
-              <Typography component="a" variant="body2" sx={{ mr: 1, textDecoration: 'none', color: 'inherit' }}>
+              <Typography component="span" variant="body2" sx={{ mr: 1, textDecoration: 'none', color: 'inherit' }}>
                 By {article.author.name}
               </Typography>
             </Link>
@@ -123,7 +123,7 @@ export default function ArticleDetailPage() {
               </Typography>
               {article.categories.map((cat, index) => (
                 cat.slug && <Link href={`/writing/category/${cat.slug.current}`} passHref key={cat.slug.current}>
-                  <Typography component="a" variant="body2" color="text.secondary" sx={{ textDecoration: 'none', color: 'inherit' }}>
+                  <Typography component="span" variant="body2" color="text.secondary" sx={{ textDecoration: 'none', color: 'inherit' }}>
                     {cat.title}
                     {index < article.categories.length - 1 && ", "}
                   </Typography>

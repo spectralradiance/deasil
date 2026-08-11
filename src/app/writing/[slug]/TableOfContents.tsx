@@ -5,6 +5,7 @@ import {
   Dialog, DialogTitle, DialogContent, useMediaQuery, useTheme,
 } from '@mui/material';
 import { TocContext } from '../../TocContext';
+import TocIcon from '@mui/icons-material/Toc';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CloseIcon from '@mui/icons-material/Close';
