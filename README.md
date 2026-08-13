@@ -45,50 +45,48 @@ show hamburger menu on each page, expand to show icons
 
 ### Sundial
 
-- add/remove clocks
-
 #### Features
 
-- Sun clock - time of day
-    - icons: sunrise, sunset, solar noon, solar midnight
-    - lines: current time of day
-    - colors: blue-orange
-    - text: morning, midday, evening, night
-    - info: twilight, golden hour, blue hour
-- Moon clock - monthly cycle
-    - icons: phases of the moon
-    - lines: current phase of the moon
-    - colors: gradient from black to white
-    - text: waxing/waning
-    - info: current phase, distance, last phase and datetime, next phase and datetime, next eclipse, last eclipse
-- Season clock - wheel of the year
-    - icons: eight sabbaths
-    - lines: current day of the year
-    - colors: rainbow
-    - text: seasons (4), months (12)?
-    - info: ??
-- Star clock - astrology
-    - icons: 12 astrological symbols
-    - lines: sun, moon, planets
-    - colors: mutable/fixed?
-    - text: ?
-    - info: ?
-
-
-#### Errors
-
-- sun clock coloration should be yellow (morning)
-
-#### Todo
-
-- Add/move/remove clocks
-- Allow user to download svg for specific clock, or all clocks
 - Datetime controls
   - Show calendar and play/pause icons - calendar allows the user to set a particular datetime, play sets it to the preset
   - Set location manually
+- Clock types
+  - Sun clock - time of day
+      - icons: sunrise, sunset, solar noon, solar midnight
+      - lines: current time of day
+      - colors: blue-orange
+      - text: morning, midday, evening, night
+      - info: twilight, golden hour, blue hour
+  - Moon clock - monthly cycle
+      - icons: phases of the moon
+      - lines: current phase of the moon
+      - colors: gradient from black to white
+      - text: waxing/waning
+      - info: current phase, distance, last phase and datetime, next phase and datetime, next eclipse, last eclipse
+  - Season clock - wheel of the year
+      - icons: eight sabbaths
+      - lines: current day of the year
+      - colors: rainbow
+      - text: seasons (4), months (12)?
+      - info: ??
+  - Star clock - astrology
+      - icons: 12 astrological symbols
+      - lines: sun, moon, planets
+      - colors: mutable/fixed?
+      - text: ?
+      - info: ?
+
+
+#### Todo
+
+- additional clocks
+  - Day of the Week
+  - Tides
+- Add/move/remove clocks in a single column, add map embed
+- Allow user to download svg for specific clock, or all clocks
+- Save to URL
 - important events in history that happened today?
 - ecospiritual reflection?
-- day of the week?
 
 ### Altar
 
@@ -107,6 +105,7 @@ show hamburger menu on each page, expand to show icons
   - Playing cards - use tarot correspondances
 - browse cards - all, minor/major, element
 - info box
+  - Instructions
   - Datasets used
     - [Kaggle - Tarot Deck](https://www.kaggle.com/datasets/lsind18/tarot-json/data)
     - [Kaggle - Tarotoo Tarot Card Meanings](https://www.kaggle.com/datasets/tarotoo/tarotoo-tarot-card-meanings)
@@ -114,6 +113,7 @@ show hamburger menu on each page, expand to show icons
 - add/remove spreads, have close button next to each reading, have browse visible by default
 - uniform design between tarot and runes
 - have reversals off by default
+- save current readings to URL
 
 
 ### Glyph

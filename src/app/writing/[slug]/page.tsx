@@ -89,12 +89,12 @@ export default function ArticleDetailPage() {
     fetchPost();
   }, [slug]);
 
-  if (!article) return <Box sx={{ p: 4 }}>Article not found.</Box>;
+  if (!article) return <Box sx={{ p: { xs: 1, md: 4 } }}>Article not found.</Box>;
 
   return (
-    <Box sx={{ p: 4 }}>
+    <Box sx={{ p: { xs: 1, md: 4 } }}>
       {article.body && <TableOfContents body={article.body} />}
-      <Box sx={{ maxWidth: 700, mx: "auto", px: 2 }}>
+      <Box sx={{ maxWidth: 700, mx: "auto", px: { xs: 0.5, md: 2 } }}>
         <Typography gutterBottom variant="h2" component="div">
           {article.title}
         </Typography>

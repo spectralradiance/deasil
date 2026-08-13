@@ -57,9 +57,14 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
       const id = slugify(getHeadingText(heading));
       const el = document.getElementById(id);
       if (!el) return;
-      if (id === activeId)       el.style.color = '#D4A017';
-      else if (id === hoveredId) el.style.color = '#FFFACD';
-      else                       el.style.color = '';
+      if (id === activeId) {
+        el.style.transition = ''; // instant on
+        el.style.color = theme.palette.primary.main;
+      } else if (id === hoveredId) {
+        el.style.color = theme.palette.mode === 'dark' ? '#FFFACD' : '#90CAF9';
+      } else {
+        el.style.color = '';
+      }
     });
     return () => {
       headings.forEach((heading) => {
@@ -73,7 +78,11 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
     e.preventDefault();
     if (activeTimerRef.current) clearTimeout(activeTimerRef.current);
     setActiveId(id);
-    activeTimerRef.current = setTimeout(() => setActiveId(null), 1000);
+    activeTimerRef.current = setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.style.transition = 'color 0.8s';
+      setActiveId(null);
+    }, 3000);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
     if (isMobile) setTocOpen(false);
   };
@@ -102,9 +111,11 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
     return acc;
   }, []);
 
-  // Active (gold flash) takes priority over hover (light yellow)
+  // Active color follows theme primary; hover is a lighter tint
+  const activeColor = theme.palette.primary.main;
+  const hoverColor = theme.palette.mode === 'dark' ? '#FFFACD' : '#90CAF9';
   const linkColor = (id: string) =>
-    id === activeId ? '#D4A017' : id === hoveredId ? '#FFFACD' : 'inherit';
+    id === activeId ? activeColor : id === hoveredId ? hoverColor : 'inherit';
 
   const tocList = () => (
     <List dense disablePadding>
@@ -123,7 +134,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
                 onMouseLeave={() => setHoveredId(null)}
                 style={{ textDecoration: 'none', color: linkColor(chapter.id), transition: 'color 0.15s', flex: 1 }}
               >
-                <ListItemText primary={chapter.text} />
+                <ListItemText primary={chapter.text} primaryTypographyProps={{ sx: { textWrap: 'balance' } }} />
               </a>
               {chapter.subheadings.length > 0 && (
                 <IconButton
@@ -152,7 +163,7 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
                   onMouseLeave={() => setHoveredId(null)}
                   style={{ textDecoration: 'none', color: linkColor(sub.id), transition: 'color 0.15s' }}
                 >
-                  <ListItemText primary={sub.text} />
+                  <ListItemText primary={sub.text} primaryTypographyProps={{ sx: { textWrap: 'balance' } }} />
                 </a>
               </ListItem>
             ))}
@@ -192,15 +203,15 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
       </IconButton>
       <Box sx={{
         position: 'fixed',
-        right: 'calc(50vw + 350px + 48px)',
-        top: 100,
+        right: 'calc(50vw + 350px + 4px)',
+        top: 156,
         width: 'max-content',
-        minWidth: 180,
-        maxWidth: 'min(600px, calc(50vw - 350px - 60px))',
-        maxHeight: 'calc(100vh - 116px)',
+        minWidth: 160,
+        maxWidth: 'min(280px, calc(50vw - 350px - 60px))',
+        maxHeight: 'calc(100vh - 172px)',
         overflowY: 'auto',
         zIndex: 1000,
-        transform: panelOpen ? 'translateX(0)' : 'translateX(calc(100% + 52px))',
+        transform: panelOpen ? 'translateY(0)' : 'translateY(-12px)',
         opacity: panelOpen ? 1 : 0,
         pointerEvents: panelOpen ? 'auto' : 'none',
         transition: 'transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.35s',
