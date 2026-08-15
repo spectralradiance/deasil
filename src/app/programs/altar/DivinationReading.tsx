@@ -1,8 +1,8 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Box, Chip, Collapse, Container, FormControl, FormControlLabel,
-  IconButton, InputLabel, MenuItem, Select, Switch, Typography,
+  Box, Checkbox, Chip, Collapse, Container, FormControl, FormControlLabel,
+  IconButton, InputLabel, MenuItem, Select, Typography,
 } from '@mui/material';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import SymbolBrowser, { type SymbolGroup } from './SymbolBrowser';
@@ -53,7 +53,7 @@ function TokenCard({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
       {/* Position label */}
-      <Collapse in={state.revealed && !!position} timeout={300}>
+      <Collapse in={state.revealed && state.infoOpen && !!position} timeout={300}>
         <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block' }}>
           {position}
         </Typography>
@@ -126,7 +126,7 @@ interface Props {
 export default function DivinationReading({ label, tokens, spreads, canReverse = false, systemSelector, browseGroups }: Props) {
   const [browseOpen, setBrowseOpen] = useState(false);
   const [selectedSpread, setSelectedSpread] = useState(spreads[0]);
-  const [allowReversals, setAllowReversals]  = useState(canReverse);
+  const [allowReversals, setAllowReversals]  = useState(false);
   const [drawn, setDrawn]                    = useState<DrawnToken[]>([]);
   const [tokenStates, setTokenStates]        = useState<Map<number, TokenState>>(new Map());
   const [visible, setVisible]                = useState(false);
@@ -192,7 +192,7 @@ export default function DivinationReading({ label, tokens, spreads, canReverse =
       <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         {/* ── Controls ── */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', justifyContent: 'center', mb: 3 }}>
-          <Typography variant="h4">{label}</Typography>
+          <Typography variant="h4">Altar</Typography>
           {systemSelector}
 
           <FormControl sx={{ minWidth: 180 }} disabled={drawn.length > 0 || isClearing}>
@@ -208,7 +208,7 @@ export default function DivinationReading({ label, tokens, spreads, canReverse =
 
           {canReverse && (
             <FormControlLabel
-              control={<Switch checked={allowReversals} onChange={e => setAllowReversals(e.target.checked)} disabled={drawn.length > 0 || isClearing} />}
+              control={<Checkbox checked={allowReversals} onChange={e => setAllowReversals(e.target.checked)} disabled={drawn.length > 0 || isClearing} />}
               label="Reversals"
             />
           )}

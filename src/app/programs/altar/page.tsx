@@ -68,7 +68,7 @@ export default function AltarPage() {
     <Box>
       {system === 0 && <TarotReading systemSelector={systemSelect} />}
       {system === 1 && <DivinationReading label="Runes" tokens={RUNE_TOKENS} spreads={RUNE_SPREADS} canReverse systemSelector={systemSelect} browseGroups={RUNE_GROUPS} />}
-      {system === 2 && <DivinationReading label="Ogham" tokens={OGHAM_TOKENS} spreads={OGHAM_SPREADS} systemSelector={systemSelect} browseGroups={OGHAM_GROUPS} />}
+      {system === 2 && <DivinationReading label="Ogham" tokens={OGHAM_TOKENS} spreads={OGHAM_SPREADS} canReverse systemSelector={systemSelect} browseGroups={OGHAM_GROUPS} />}
     </Box>
   );
 }

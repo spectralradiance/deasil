@@ -20,12 +20,12 @@ export default function TarotReading({ systemSelector }: { systemSelector?: Reac
   const [selectedSpread, setSelectedSpread] = useState<SpreadOption>(SPREADS[0]);
   const [customCount, setCustomCount] = useState(1);
   const [customPositionText, setCustomPositionText] = useState('');
-  const [allowReversals, setAllowReversals] = useState(true);
+  const [allowReversals, setAllowReversals] = useState(false);
   /**
    * Snapshot of whether reversals were active when the current cards were drawn.
    * Used to determine how the modal displays meaning text (upright vs reversed).
    */
-  const [readingHasReversals, setReadingHasReversals] = useState(true);
+  const [readingHasReversals, setReadingHasReversals] = useState(false);
   /** Per-card flip state; keyed by card index within the current draw */
   const [flipStates, setFlipStates] = useState<Map<number, CardFlipState>>(new Map());
   /** Controls the opacity fade when cards appear or disappear */
