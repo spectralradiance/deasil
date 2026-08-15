@@ -395,6 +395,21 @@ export default function PhotosSlugPage({ params }: { params: Promise<{ slug: str
             from { opacity: 0; transform: translateY(10px); }
             to   { opacity: 1; transform: translateY(0); }
           }
+          @media (max-width: 600px) {
+            .lightbox-caption-bar { padding-top: 56px !important; }
+            .yarl__navigation_prev,
+            .yarl__navigation_next {
+              top: auto !important;
+              bottom: 0 !important;
+              transform: none !important;
+              width: 50% !important;
+              height: 56px !important;
+              justify-content: center !important;
+            }
+            .yarl__navigation_prev { left: 0 !important; }
+            .yarl__navigation_next { right: 0 !important; left: auto !important; }
+            .lightbox-image-area { padding-bottom: 56px !important; }
+          }
         `}</style>
 
         {photographs.length > 0 ? (
@@ -532,7 +547,7 @@ export default function PhotosSlugPage({ params }: { params: Promise<{ slug: str
               return (
                 <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%" }}>
                   {showCaptions && p && (
-                    <div style={{
+                    <div className="lightbox-caption-bar" style={{
                       flexShrink: 0,
                       background: "rgba(0,0,0,0.6)",
                       borderBottom: "1px solid rgba(255,255,255,0.1)",
@@ -557,7 +572,7 @@ export default function PhotosSlugPage({ params }: { params: Promise<{ slug: str
                       {p.shutterSpeed && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Timer style={{ fontSize: 15 }} />{p.shutterSpeed}</span>}
                     </div>
                   )}
-                  <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                  <div className="lightbox-image-area" style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={(slide as { src?: string }).src ?? ""}
