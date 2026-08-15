@@ -1,6 +1,6 @@
 'use client';
 import { useRef, useState } from 'react';
-import { Box, Container, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
+import { Box, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import TarotControls from './TarotReading';
 import DivinationControls from './DivinationReading';
 import { ReadingEntry, type AnyReading, type DivinationToken, type DrawSpread, type DrawnToken, type TokenState } from './ReadingEntry';
@@ -72,8 +72,7 @@ export default function AltarPage() {
   );
 
   return (
-    <Container maxWidth={false}>
-      <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <Box sx={{ width: '100%', maxWidth: 1200, mx: 'auto', p: 3, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
         {system === 0 && (
           <TarotControls
             systemSelector={systemSelect}
@@ -121,7 +120,6 @@ export default function AltarPage() {
             />
           ))}
         </Box>
-      </Box>
 
       {modalCard && (
         <CardModal
@@ -130,7 +128,7 @@ export default function AltarPage() {
           onClose={() => setModalCard(null)}
         />
       )}
-    </Container>
+    </Box>
   );
 }
 

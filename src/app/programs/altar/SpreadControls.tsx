@@ -67,12 +67,14 @@ export default function SpreadControls({
           mb: 2,
           display: 'flex',
           alignItems: 'center',
-          gap: 2,
+          justifyContent: 'space-between',
+          width: '100%',
           flexWrap: 'wrap',
-          justifyContent: 'center',
+          gap: 2,
         }}
       >
         <Typography variant="h4">Altar</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         {systemSelector}
 
         {/* Spread type selector */}
@@ -123,6 +125,7 @@ export default function SpreadControls({
           : <Button variant="outlined" onClick={onDraw} disabled={isClearing}>Draw</Button>
         }
         <Button variant="text" onClick={onBrowse} color={browseOpen ? 'primary' : 'inherit'}>Browse</Button>
+        </Box>
       </Box>
 
       {/* ── Custom positions textarea ─────────────────────────────────────── */}

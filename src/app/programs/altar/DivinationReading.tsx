@@ -35,8 +35,9 @@ export default function DivinationControls({ tokens, spreads, canReverse = false
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', justifyContent: 'center', mb: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 2, mb: 2 }}>
         <Typography variant="h4">Altar</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         {systemSelector}
 
         <FormControl sx={{ minWidth: 180 }}>
@@ -65,6 +66,7 @@ export default function DivinationControls({ tokens, spreads, canReverse = false
             Browse
           </Box>
         )}
+        </Box>
       </Box>
       {browseOpen && browseGroups && <SymbolBrowser groups={browseGroups} />}
     </Box>

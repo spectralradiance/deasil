@@ -1,6 +1,6 @@
 "use client";
 import { useState } from 'react';
-import { Box, Container } from '@mui/material';
+import { Box } from '@mui/material';
 import { enrichedCards } from './tarot-data';
 import { SPREADS, type DrawnCard, type SpreadOption, type SpreadPosition } from './tarot-constants';
 import SpreadControls from './SpreadControls';
@@ -36,9 +36,8 @@ export default function TarotControls({ systemSelector, onDraw }: {
   };
 
   return (
-    <Container maxWidth={false}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <SpreadControls
+    <Box sx={{ width: '100%' }}>
+      <SpreadControls
           selectedSpread={selectedSpread}
           onSpreadChange={setSelectedSpread}
           customCount={customCount}
@@ -56,7 +55,6 @@ export default function TarotControls({ systemSelector, onDraw }: {
           systemSelector={systemSelector}
         />
         {browseOpen && <CardBrowser />}
-      </Box>
-    </Container>
+    </Box>
   );
 }
