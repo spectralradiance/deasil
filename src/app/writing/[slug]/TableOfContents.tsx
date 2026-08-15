@@ -22,7 +22,7 @@ interface TableOfContentsProps {
 
 const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
   const [headings, setHeadings] = useState<Heading[]>([]);
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
   const { tocOpen, setTocOpen, setHasToc } = useContext(TocContext);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
