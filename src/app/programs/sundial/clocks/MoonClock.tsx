@@ -12,7 +12,7 @@
 import React, { useMemo } from 'react';
 import { useTheme } from '@mui/material';
 import RadialClock, { ColorStop, RingIcon, RingLabel, RingSector } from './RadialClock';
-import { SYNODIC_MONTH } from './astro';
+import { SYNODIC_MONTH } from '../lib/astro';
 
 // ---- Phase data with descriptions --------------------------
 export interface PhaseInfo { name: string; description: string }

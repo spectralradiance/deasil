@@ -1,6 +1,4 @@
-// ============================================================
-// astro.ts — Shared astronomical calculation utilities
-// ============================================================
+// Astronomical calculations: sun times, lunar age, planetary positions, aspects, and sabbat proximity.
 
 // --- Lunar constants ---
 // Synodic month length in days (new moon to new moon)

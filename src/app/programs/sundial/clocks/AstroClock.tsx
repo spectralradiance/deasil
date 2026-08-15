@@ -12,7 +12,7 @@
 import React from 'react';
 import { Box } from '@mui/material';
 import RadialClock, { ColorStop } from './RadialClock';
-import { calcPlanetLongitudes, calcAspects } from './astro';
+import { calcPlanetLongitudes, calcAspects } from '../lib/astro';
 
 // ---- Zodiac sign data with descriptions ---------------------
 
