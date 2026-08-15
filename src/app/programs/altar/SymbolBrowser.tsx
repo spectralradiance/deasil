@@ -5,7 +5,7 @@ import {
   Divider, IconButton, Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import type { DivinationToken } from './DivinationReading';
+import type { DivinationToken } from './ReadingEntry';
 
 export interface SymbolGroup { name: string; tokens: DivinationToken[]; }
 

@@ -1,11 +1,14 @@
 'use client';
-import { useState } from 'react';
-import { Box, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
-import TarotReading from './TarotReading';
-import DivinationReading, { type DivinationToken, type DrawSpread } from './DivinationReading';
+import { useRef, useState } from 'react';
+import { Box, Container, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
+import TarotControls from './TarotReading';
+import DivinationControls from './DivinationReading';
+import { ReadingEntry, type AnyReading, type DivinationToken, type DrawSpread, type DrawnToken, type TokenState } from './ReadingEntry';
+import CardModal from './CardModal';
 import { RUNES, RUNE_AETTS } from './rune-data';
 import { OGHAM, OGHAM_AICMI } from './ogham-data';
 import type { SymbolGroup } from './SymbolBrowser';
+import type { DrawnCard } from './tarot-constants';
 
 const RUNE_TOKENS: DivinationToken[] = RUNES.map(r => ({
   id: r.name, symbol: r.symbol, name: r.name,
@@ -52,6 +55,10 @@ const OGHAM_SPREADS: DrawSpread[] = [
 
 export default function AltarPage() {
   const [system, setSystem] = useState(0);
+  const [readings, setReadings] = useState<AnyReading[]>([]);
+  const [modalCard, setModalCard] = useState<DrawnCard | null>(null);
+  const [modalIsReversed, setModalIsReversed] = useState(false);
+  const nextId = useRef(0);
 
   const systemSelect = (
     <FormControl sx={{ minWidth: 130 }}>
@@ -65,11 +72,65 @@ export default function AltarPage() {
   );
 
   return (
-    <Box>
-      {system === 0 && <TarotReading systemSelector={systemSelect} />}
-      {system === 1 && <DivinationReading label="Runes" tokens={RUNE_TOKENS} spreads={RUNE_SPREADS} canReverse systemSelector={systemSelect} browseGroups={RUNE_GROUPS} />}
-      {system === 2 && <DivinationReading label="Ogham" tokens={OGHAM_TOKENS} spreads={OGHAM_SPREADS} canReverse systemSelector={systemSelect} browseGroups={OGHAM_GROUPS} />}
-    </Box>
+    <Container maxWidth={false}>
+      <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {system === 0 && (
+          <TarotControls
+            systemSelector={systemSelect}
+            onDraw={data => setReadings(prev => [{ kind: 'tarot', id: nextId.current++, ...data }, ...prev])}
+          />
+        )}
+        {system === 1 && (
+          <DivinationControls
+            tokens={RUNE_TOKENS} spreads={RUNE_SPREADS} canReverse
+            systemSelector={systemSelect} browseGroups={RUNE_GROUPS}
+            onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Runes', tokens, spread, states: new Map() }, ...prev])}
+          />
+        )}
+        {system === 2 && (
+          <DivinationControls
+            tokens={OGHAM_TOKENS} spreads={OGHAM_SPREADS} canReverse
+            systemSelector={systemSelect} browseGroups={OGHAM_GROUPS}
+            onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Ogham', tokens, spread, states: new Map() }, ...prev])}
+          />
+        )}
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', mt: 4 }}>
+          {readings.map((reading, idx) => (
+            <ReadingEntry
+              key={reading.id}
+              reading={reading}
+              isFirst={idx === 0}
+              isLast={idx === readings.length - 1}
+              onMoveUp={() => setReadings(prev => { const a = [...prev]; [a[idx], a[idx - 1]] = [a[idx - 1], a[idx]]; return a; })}
+              onMoveDown={() => setReadings(prev => { const a = [...prev]; [a[idx], a[idx + 1]] = [a[idx + 1], a[idx]]; return a; })}
+              onRemove={() => setReadings(prev => prev.filter(r => r.id !== reading.id))}
+              onReveal={i => setReadings(prev => prev.map(r => r.id !== reading.id || r.kind !== 'tokens' ? r : { ...r, states: new Map(r.states).set(i, { revealed: true, infoOpen: false }) }))}
+              onToggleInfo={i => setReadings(prev => prev.map(r => {
+                if (r.id !== reading.id || r.kind !== 'tokens') return r;
+                const s = r.states.get(i) ?? { revealed: false, infoOpen: false };
+                return { ...r, states: new Map(r.states).set(i, { ...s, infoOpen: !s.infoOpen }) };
+              }))}
+              onRevealAll={() => setReadings(prev => prev.map(r => {
+                if (r.id !== reading.id || r.kind !== 'tokens') return r;
+                const next = new Map<number, TokenState>();
+                r.tokens.forEach((_, i) => next.set(i, { revealed: true, infoOpen: true }));
+                return { ...r, states: next };
+              }))}
+              onOpenModal={(card, isReversed) => { setModalCard(card); setModalIsReversed(isReversed); }}
+            />
+          ))}
+        </Box>
+      </Box>
+
+      {modalCard && (
+        <CardModal
+          modalCard={modalCard}
+          modalIsReversed={modalIsReversed}
+          onClose={() => setModalCard(null)}
+        />
+      )}
+    </Container>
   );
 }
 
