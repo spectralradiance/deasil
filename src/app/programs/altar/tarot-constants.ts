@@ -63,6 +63,14 @@ export const DEFAULT_FLIP: CardFlipState = {
   phase: 'idle',
 };
 
+/** Face-up, info expanded — used when restoring a saved reading */
+export const REVEALED_FLIP: CardFlipState = {
+  isFront: true,
+  contentVisible: true,
+  axis: 'Y',
+  phase: 'idle',
+};
+
 // ── Context panel type ────────────────────────────────────────────────────────
 
 /** Which context chip panel is currently expanded in the card detail modal */

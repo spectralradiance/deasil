@@ -94,6 +94,7 @@ function hydrateTarot(saved: SavedTarot, id: number): TarotReadingRecord | null 
     spread,
     positions,
     hasReversals: saved.rv === 1 || cards.some(c => c.isReversed),
+    startRevealed: true,
   };
 }
 
@@ -111,13 +112,15 @@ function hydrateTokens(saved: SavedTokens, id: number): TokenReadingRecord | nul
     count: tokens.length,
     positions: saved.p,
   };
+  const states = new Map<number, { revealed: true; infoOpen: true }>();
+  tokens.forEach((_, i) => states.set(i, { revealed: true, infoOpen: true }));
   return {
     kind: 'tokens',
     id,
     label: saved.k === 'o' ? 'Ogham' : 'Runes',
     tokens,
     spread,
-    states: new Map(),
+    states,
   };
 }
 
@@ -128,21 +131,44 @@ function hydrateReading(saved: SavedReading, id: number): AnyReading | null {
   return null;
 }
 
-/** Compact JSON of drawn cards / tokens — enough to restore the same reading. */
+function jsonToBase64Url(json: string): string {
+  const bytes = new TextEncoder().encode(json);
+  let bin = '';
+  for (const byte of bytes) bin += String.fromCharCode(byte);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlToJson(raw: string): string | null {
+  try {
+    const padded = raw.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((raw.length + 3) % 4);
+    const bin = atob(padded);
+    const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+function parseSavedJson(json: string): AnyReading[] {
+  const parsed: unknown = JSON.parse(json);
+  if (!Array.isArray(parsed)) return [];
+  const readings: AnyReading[] = [];
+  for (const item of parsed) {
+    const reading = hydrateReading(item as SavedReading, readings.length);
+    if (reading) readings.push(reading);
+  }
+  return readings;
+}
+
+/** Compact JSON of drawn cards / tokens, then base64url so the URL is opaque. */
 export function encodeReadings(readings: AnyReading[]): string {
-  return JSON.stringify(readings.map(serializeReading));
+  return jsonToBase64Url(JSON.stringify(readings.map(serializeReading)));
 }
 
 export function decodeReadings(raw: string): AnyReading[] {
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    const readings: AnyReading[] = [];
-    for (const item of parsed) {
-      const reading = hydrateReading(item as SavedReading, readings.length);
-      if (reading) readings.push(reading);
-    }
-    return readings;
+    const json = base64UrlToJson(raw) ?? raw;
+    return parseSavedJson(json);
   } catch {
     return [];
   }

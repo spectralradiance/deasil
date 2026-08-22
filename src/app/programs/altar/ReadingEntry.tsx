@@ -11,7 +11,7 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import MenuIcon from '@mui/icons-material/Menu';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import CardItem from './CardItem';
-import { DEFAULT_FLIP, LAYOUT_CARD_W, LAYOUT_GAP, type CardFlipState, type DrawnCard, type SpreadOption, type SpreadPosition } from './tarot-constants';
+import { DEFAULT_FLIP, LAYOUT_CARD_W, LAYOUT_GAP, REVEALED_FLIP, type CardFlipState, type DrawnCard, type SpreadOption, type SpreadPosition } from './tarot-constants';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -56,6 +56,8 @@ export interface TarotReadingRecord {
   spread: SpreadOption;
   positions: SpreadPosition[] | undefined;
   hasReversals: boolean;
+  /** When true, cards start face-up (used for readings restored from a URL). */
+  startRevealed?: boolean;
 }
 
 export type AnyReading = TarotReadingRecord | TokenReadingRecord;
@@ -120,7 +122,10 @@ function TarotContent({ record, viewMode, onOpenModal }: {
   viewMode: 'grid' | 'list';
   onOpenModal: (card: DrawnCard, isReversed: boolean) => void;
 }) {
-  const [flipStates, setFlipStates] = useState<Map<number, CardFlipState>>(new Map());
+  const [flipStates, setFlipStates] = useState<Map<number, CardFlipState>>(() => {
+    if (!record.startRevealed) return new Map();
+    return new Map(record.cards.map((_, i) => [i, REVEALED_FLIP]));
+  });
   const getFlip = (i: number) => flipStates.get(i) ?? DEFAULT_FLIP;
   const isGrid = viewMode === 'grid' && !!record.spread.layout;
 

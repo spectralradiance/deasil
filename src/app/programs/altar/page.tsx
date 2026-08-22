@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Box, Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import TarotControls from './TarotReading';
 import DivinationControls from './DivinationReading';
+import OracleBrowser from './OracleBrowser';
 import { ReadingEntry, type AnyReading, type DivinationToken, type DrawSpread, type TokenState } from './ReadingEntry';
 import CardModal from './CardModal';
 import { RUNES, RUNE_AETTS } from './rune-data';
@@ -60,6 +61,8 @@ export default function AltarPage() {
   const [modalCard, setModalCard] = useState<DrawnCard | null>(null);
   const [modalIsReversed, setModalIsReversed] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [browseOpen, setBrowseOpen] = useState(false);
+  const [browseTab, setBrowseTab] = useState(0);
   const nextId = useRef(0);
 
   useEffect(() => {
@@ -75,6 +78,13 @@ export default function AltarPage() {
     window.setTimeout(() => setSaved(false), 2000);
   };
 
+  const handleBrowse = () => {
+    setBrowseOpen(open => {
+      if (!open) setBrowseTab(system);
+      return !open;
+    });
+  };
+
   const extraActions = (
     <Button variant="outlined" onClick={handleSave} disabled={readings.length === 0}>
       {saved ? 'Saved' : 'Save'}
@@ -82,7 +92,7 @@ export default function AltarPage() {
   );
 
   const systemSelect = (
-    <FormControl sx={{ minWidth: 130 }}>
+    <FormControl sx={{ minWidth: 130 }} disabled={browseOpen}>
       <InputLabel>Oracle</InputLabel>
       <Select value={system} label="Oracle" onChange={e => setSystem(Number(e.target.value))}>
         <MenuItem value={0}>Tarot</MenuItem>
@@ -98,21 +108,34 @@ export default function AltarPage() {
           <TarotControls
             systemSelector={systemSelect}
             extraActions={extraActions}
+            browseOpen={browseOpen}
+            onBrowse={handleBrowse}
             onDraw={data => setReadings(prev => [{ kind: 'tarot', id: nextId.current++, ...data }, ...prev])}
           />
         )}
         {system === 1 && (
           <DivinationControls
             tokens={RUNE_TOKENS} spreads={RUNE_SPREADS} canReverse
-            systemSelector={systemSelect} extraActions={extraActions} browseGroups={RUNE_GROUPS}
+            systemSelector={systemSelect} extraActions={extraActions}
+            browseOpen={browseOpen} onBrowse={handleBrowse}
             onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Runes', tokens, spread, states: new Map() }, ...prev])}
           />
         )}
         {system === 2 && (
           <DivinationControls
             tokens={OGHAM_TOKENS} spreads={OGHAM_SPREADS} canReverse
-            systemSelector={systemSelect} extraActions={extraActions} browseGroups={OGHAM_GROUPS}
+            systemSelector={systemSelect} extraActions={extraActions}
+            browseOpen={browseOpen} onBrowse={handleBrowse}
             onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Ogham', tokens, spread, states: new Map() }, ...prev])}
+          />
+        )}
+
+        {browseOpen && (
+          <OracleBrowser
+            tab={browseTab}
+            onTabChange={setBrowseTab}
+            runeGroups={RUNE_GROUPS}
+            oghamGroups={OGHAM_GROUPS}
           />
         )}
 

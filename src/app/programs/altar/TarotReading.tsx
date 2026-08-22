@@ -4,22 +4,21 @@ import { Box } from '@mui/material';
 import { enrichedCards } from './tarot-data';
 import { SPREADS, type DrawnCard, type SpreadOption, type SpreadPosition } from './tarot-constants';
 import SpreadControls from './SpreadControls';
-import CardBrowser from './CardBrowser';
 import { type TarotReadingRecord } from './ReadingEntry';
 
-export default function TarotControls({ systemSelector, extraActions, onDraw }: {
+export default function TarotControls({ systemSelector, extraActions, browseOpen, onBrowse, onDraw }: {
   systemSelector?: React.ReactNode;
   extraActions?: React.ReactNode;
+  browseOpen: boolean;
+  onBrowse: () => void;
   onDraw: (data: Omit<TarotReadingRecord, 'id' | 'kind'>) => void;
 }) {
   const [selectedSpread, setSelectedSpread] = useState<SpreadOption>(SPREADS[0]);
   const [customCount, setCustomCount] = useState(1);
   const [customPositionText, setCustomPositionText] = useState('');
   const [allowReversals, setAllowReversals] = useState(false);
-  const [browseOpen, setBrowseOpen] = useState(false);
 
   const draw = () => {
-    setBrowseOpen(false);
     const count = selectedSpread.count ?? customCount;
     const availableCards = [...enrichedCards];
     const newCards: DrawnCard[] = [];
@@ -51,12 +50,11 @@ export default function TarotControls({ systemSelector, extraActions, onDraw }: 
           isClearing={false}
           onDraw={draw}
           onClear={() => {}}
-          onBrowse={() => setBrowseOpen(b => !b)}
+          onBrowse={onBrowse}
           browseOpen={browseOpen}
           systemSelector={systemSelector}
           extraActions={extraActions}
         />
-        {browseOpen && <CardBrowser />}
     </Box>
   );
 }

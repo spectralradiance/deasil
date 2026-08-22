@@ -58,8 +58,8 @@ export default function SpreadControls({
   systemSelector,
   extraActions,
 }: SpreadControlsProps) {
-  // Controls are locked once cards are on the table or during the clear animation
-  const locked = drawnCards.length > 0 || isClearing;
+  // Locked while cards are showing, clearing, or the catalog is open
+  const locked = drawnCards.length > 0 || isClearing || browseOpen;
 
   return (
     <>
@@ -123,10 +123,10 @@ export default function SpreadControls({
 
         {/* Draw / Clear — mutually exclusive based on whether cards are showing */}
         {drawnCards.length > 0
-          ? <Button variant="outlined" onClick={onClear} disabled={isClearing}>Clear</Button>
-          : <Button variant="outlined" onClick={onDraw} disabled={isClearing}>Draw</Button>
+          ? <Button variant="outlined" onClick={onClear} disabled={isClearing || browseOpen}>Clear</Button>
+          : <Button variant="outlined" onClick={onDraw} disabled={isClearing || browseOpen}>Draw</Button>
         }
-        <Button variant="text" onClick={onBrowse} color={browseOpen ? 'primary' : 'inherit'}>Browse</Button>
+        <Button variant="outlined" onClick={onBrowse} aria-pressed={browseOpen}>Browse</Button>
         {extraActions}
         </Box>
       </Box>

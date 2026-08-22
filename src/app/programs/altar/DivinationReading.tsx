@@ -1,10 +1,9 @@
 'use client';
 import { useState } from 'react';
 import {
-  Box, Checkbox, FormControl, FormControlLabel,
+  Box, Button, Checkbox, FormControl, FormControlLabel,
   InputLabel, MenuItem, Select, Typography,
 } from '@mui/material';
-import SymbolBrowser, { type SymbolGroup } from './SymbolBrowser';
 import { type DivinationToken, type DrawSpread, type DrawnToken } from './ReadingEntry';
 
 interface Props {
@@ -13,12 +12,12 @@ interface Props {
   canReverse?: boolean;
   systemSelector?: React.ReactNode;
   extraActions?: React.ReactNode;
-  browseGroups?: SymbolGroup[];
+  browseOpen: boolean;
+  onBrowse: () => void;
   onDraw: (tokens: DrawnToken[], spread: DrawSpread) => void;
 }
 
-export default function DivinationControls({ tokens, spreads, canReverse = false, systemSelector, extraActions, browseGroups, onDraw }: Props) {
-  const [browseOpen, setBrowseOpen] = useState(false);
+export default function DivinationControls({ tokens, spreads, canReverse = false, systemSelector, extraActions, browseOpen, onBrowse, onDraw }: Props) {
   const [selectedSpread, setSelectedSpread] = useState(spreads[0]);
   const [allowReversals, setAllowReversals] = useState(false);
 
@@ -41,7 +40,7 @@ export default function DivinationControls({ tokens, spreads, canReverse = false
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         {systemSelector}
 
-        <FormControl sx={{ minWidth: 180 }}>
+        <FormControl sx={{ minWidth: 180 }} disabled={browseOpen}>
           <InputLabel>Spread</InputLabel>
           <Select value={selectedSpread.name} label="Spread"
             onChange={e => setSelectedSpread(spreads.find(s => s.name === e.target.value)!)}
@@ -52,25 +51,16 @@ export default function DivinationControls({ tokens, spreads, canReverse = false
 
         {canReverse && (
           <FormControlLabel
-            control={<Checkbox checked={allowReversals} onChange={e => setAllowReversals(e.target.checked)} />}
+            control={<Checkbox checked={allowReversals} onChange={e => setAllowReversals(e.target.checked)} disabled={browseOpen} />}
             label="Reversals"
           />
         )}
 
-        <Box component="button" onClick={() => { setBrowseOpen(false); draw(); }}
-          sx={{ px: 2, py: 0.75, borderRadius: 1, border: '1px solid', borderColor: 'primary.main', bgcolor: 'transparent', color: 'primary.main', cursor: 'pointer', '&:hover': { color: 'primary.light', borderColor: 'primary.light' } }}>
-          Draw
-        </Box>
-        {browseGroups && (
-          <Box component="button" onClick={() => setBrowseOpen(b => !b)}
-            sx={{ px: 2, py: 0.75, borderRadius: 1, border: 'none', bgcolor: 'transparent', color: browseOpen ? 'primary.main' : 'inherit', cursor: 'pointer', '&:hover': { color: 'primary.light' } }}>
-            Browse
-          </Box>
-        )}
+        <Button variant="outlined" onClick={draw} disabled={browseOpen}>Draw</Button>
+        <Button variant="outlined" onClick={onBrowse} aria-pressed={browseOpen}>Browse</Button>
         {extraActions}
         </Box>
       </Box>
-      {browseOpen && browseGroups && <SymbolBrowser groups={browseGroups} />}
     </Box>
   );
 }
