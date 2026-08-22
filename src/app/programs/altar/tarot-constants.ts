@@ -74,11 +74,11 @@ export type OpenContext =
 // ── Layout & animation constants ──────────────────────────────────────────────
 
 /** Nominal card width used for grid-size calculations (px) */
-export const LAYOUT_CARD_W = 90;
+export const LAYOUT_CARD_W = 160;
 /** Nominal card height used for grid-size calculations (px) */
-export const LAYOUT_CARD_H = 158;
+export const LAYOUT_CARD_H = 280;
 /** Gutter between cards in a positioned layout grid (px) */
-export const LAYOUT_GAP = 14;
+export const LAYOUT_GAP = 16;
 /** Duration of the draw / clear opacity fade (ms) */
 export const CARDS_FADE_MS = 280;
 

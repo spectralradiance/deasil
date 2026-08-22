@@ -2,12 +2,16 @@
 import { useState } from 'react';
 import {
   Box, Chip, Collapse, Grid, IconButton, Menu, MenuItem, Typography,
-  useMediaQuery, useTheme,
 } from '@mui/material';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
+import CloseIcon from '@mui/icons-material/Close';
+import GridViewIcon from '@mui/icons-material/GridView';
 import MenuIcon from '@mui/icons-material/Menu';
+import ViewListIcon from '@mui/icons-material/ViewList';
 import CardItem from './CardItem';
-import { DEFAULT_FLIP, LAYOUT_GAP, type CardFlipState, type DrawnCard, type SpreadOption, type SpreadPosition } from './tarot-constants';
+import { DEFAULT_FLIP, LAYOUT_CARD_W, LAYOUT_GAP, type CardFlipState, type DrawnCard, type SpreadOption, type SpreadPosition } from './tarot-constants';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -111,20 +115,27 @@ function TokenCard({ token, state, position, onReveal, onToggleInfo }: {
 
 // ── Tarot card display (manages its own flip state) ───────────────────────────
 
-function TarotContent({ record, onOpenModal }: {
+function TarotContent({ record, viewMode, onOpenModal }: {
   record: TarotReadingRecord;
+  viewMode: 'grid' | 'list';
   onOpenModal: (card: DrawnCard, isReversed: boolean) => void;
 }) {
   const [flipStates, setFlipStates] = useState<Map<number, CardFlipState>>(new Map());
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const getFlip = (i: number) => flipStates.get(i) ?? DEFAULT_FLIP;
+  const isGrid = viewMode === 'grid' && !!record.spread.layout;
 
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>, index: number) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const relX = Math.abs((e.clientX - rect.left) / rect.width - 0.5);
     const relY = Math.abs((e.clientY - rect.top) / rect.height - 0.5);
     const axis: 'X' | 'Y' = relX >= relY ? 'Y' : 'X';
+    const current = getFlip(index);
+    if (current.phase !== 'idle') return;
+    if (current.isFront && isGrid) {
+      const card = record.cards[index];
+      onOpenModal(card, card.isReversed && record.hasReversals);
+      return;
+    }
     setFlipStates(prev => {
       const s = prev.get(index) ?? DEFAULT_FLIP;
       if (s.phase !== 'idle') return prev;
@@ -143,18 +154,18 @@ function TarotContent({ record, onOpenModal }: {
   };
 
   const layoutCols = record.spread.layout ? Math.max(...record.spread.layout.map(p => p.col)) : 0;
-  const naturalGridW = (layoutCols + 1) * (200 + LAYOUT_GAP) - LAYOUT_GAP;
+  const naturalGridW = (layoutCols + 1) * (LAYOUT_CARD_W + LAYOUT_GAP) - LAYOUT_GAP;
 
-  if (record.spread.layout && !isMobile) {
+  if (isGrid) {
     return (
-      <Box sx={{ width: '100%', mt: 2 }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${layoutCols + 1}, 1fr)`, gap: `${LAYOUT_GAP}px`, width: '100%', maxWidth: `${naturalGridW}px`, mx: 'auto', alignItems: 'start' }}>
+      <Box sx={{ width: '100%', mt: 2, overflowX: 'auto' }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${layoutCols + 1}, minmax(${LAYOUT_CARD_W}px, 1fr))`, gap: `${LAYOUT_GAP}px`, width: '100%', maxWidth: `${naturalGridW}px`, mx: 'auto', alignItems: 'start' }}>
           {record.cards.map((card, i) => {
             const gridPos = record.spread.layout![i];
             if (!gridPos) return null;
             const flip = getFlip(i);
             return (
-              <Box key={i} sx={{ gridColumn: gridPos.col + 1, gridRow: gridPos.row + 1, display: 'flex', flexDirection: 'column', py: flip.contentVisible ? 2 : 0, transition: 'padding 0.3s' }}>
+              <Box key={i} sx={{ gridColumn: gridPos.col + 1, gridRow: gridPos.row + 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <CardItem card={card} index={i} flipState={flip} position={record.positions?.[i]}
                   onCardClick={handleCardClick} onAnimationEnd={handleAnimationEnd}
                   onInfoClick={c => onOpenModal(c, c.isReversed && record.hasReversals)} variant="layout" />
@@ -166,7 +177,7 @@ function TarotContent({ record, onOpenModal }: {
     );
   }
   return (
-    <Grid container spacing={3} justifyContent="center" sx={{ mt: 2 }}>
+    <Grid container spacing={3} justifyContent="center" sx={{ mt: 2, width: '100%' }}>
       {record.cards.map((card, i) => (
         <Grid size={{ xs: 12, sm: 6, md: 4 }} key={i}>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -198,14 +209,18 @@ export function ReadingEntry({
   onOpenModal: (card: DrawnCard, isReversed: boolean) => void;
 }) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const hasLayout = reading.kind === 'tarot' && !!reading.spread.layout;
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(hasLayout ? 'grid' : 'list');
   const label = reading.kind === 'tokens' ? reading.label : 'Tarot';
+  const menuItemSx = { justifyContent: 'center', minHeight: 40 };
 
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'fadeIn 0.3s ease', '@keyframes fadeIn': { from: { opacity: 0 }, to: { opacity: 1 } } }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <Typography variant="caption" color="text.secondary">
+      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: 1 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
           {label} · {reading.spread.name}
         </Typography>
+        <Box sx={{ flex: 1, height: '1px', bgcolor: 'white', mx: 1.5 }} />
         {reading.kind === 'tokens' && (
           <IconButton onClick={onRevealAll} title="Reveal all" size="small">
             <AutorenewIcon fontSize="small" />
@@ -228,13 +243,34 @@ export function ReadingEntry({
           ))}
         </Box>
       ) : (
-        <TarotContent record={reading} onOpenModal={onOpenModal} />
+        <TarotContent record={reading} viewMode={viewMode} onOpenModal={onOpenModal} />
       )}
 
-      <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
-        <MenuItem onClick={() => { onMoveUp(); setMenuAnchor(null); }} disabled={isFirst}>Move Up</MenuItem>
-        <MenuItem onClick={() => { onMoveDown(); setMenuAnchor(null); }} disabled={isLast}>Move Down</MenuItem>
-        <MenuItem onClick={() => { onRemove(); setMenuAnchor(null); }}>Remove</MenuItem>
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={() => setMenuAnchor(null)}
+        slotProps={{ paper: { sx: { minWidth: 48 } } }}
+      >
+        <MenuItem onClick={() => { onMoveUp(); setMenuAnchor(null); }} disabled={isFirst} title="Move up" aria-label="Move up" sx={menuItemSx}>
+          <ArrowUpwardIcon fontSize="small" />
+        </MenuItem>
+        <MenuItem onClick={() => { onMoveDown(); setMenuAnchor(null); }} disabled={isLast} title="Move down" aria-label="Move down" sx={menuItemSx}>
+          <ArrowDownwardIcon fontSize="small" />
+        </MenuItem>
+        <MenuItem onClick={() => { onRemove(); setMenuAnchor(null); }} title="Remove" aria-label="Remove" sx={menuItemSx}>
+          <CloseIcon fontSize="small" />
+        </MenuItem>
+        {hasLayout && (
+          <MenuItem
+            onClick={() => { setViewMode(m => m === 'grid' ? 'list' : 'grid'); setMenuAnchor(null); }}
+            title={viewMode === 'grid' ? 'List view' : 'Grid view'}
+            aria-label={viewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
+            sx={menuItemSx}
+          >
+            {viewMode === 'grid' ? <ViewListIcon fontSize="small" /> : <GridViewIcon fontSize="small" />}
+          </MenuItem>
+        )}
       </Menu>
     </Box>
   );

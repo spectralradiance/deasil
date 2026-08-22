@@ -36,21 +36,25 @@ interface CardItemProps {
   onInfoClick: (card: DrawnCard) => void;
   /**
    * Rendering mode:
-   * - 'layout' — fills its CSS-grid cell (width: 100%, aspect-ratio 200/350, fill Image).
-   * - 'grid'   — uses a fixed 200 × 350 container for the MUI Grid fallback on mobile.
+   * - 'layout' — fills its CSS-grid cell; face-up clicks open a modal (no expand/collapse).
+   * - 'grid'   — fixed 200 × 350 card with expand/collapse text above and below.
    */
   variant?: 'layout' | 'grid';
 }
 
 /**
- * A single tarot card, comprising three stacked sections:
+ * A single tarot card.
+ *
+ * List view (`variant="grid"`) stacks three sections:
  * 1. A collapsible **position label** above the card (e.g. "Past", "Outcome")
  * 2. A click-to-flip **card image** with a two-phase shrink/grow CSS animation
  * 3. A collapsible **info section** below (card name, keywords, detail icon)
  *
- * The flip state machine lives in the parent component (`TarotReading`).
- * This component only fires `onCardClick` and `onAnimationEnd` callbacks so
- * the parent can update the shared `flipStates` map.
+ * Grid view (`variant="layout"`) shows only the card image and a compact
+ * position name; face-up clicks are handled by the parent to open a modal.
+ *
+ * The flip state machine lives in the parent. This component fires
+ * `onCardClick` and `onAnimationEnd` so the parent can update `flipStates`.
  */
 export default function CardItem({
   card,
@@ -67,32 +71,33 @@ export default function CardItem({
   // Build the CSS animation name from the current phase and flip axis
   const animName = `flip${phase === 'shrink' ? 'Shrink' : 'Grow'}${axis}`;
 
+  const isLayout = variant === 'layout';
+
   return (
     <>
-      {/* ── Position label ─────────────────────────────────────────────────── */}
-      {/* Slides in above the card when the card has been flipped face-up */}
-      <Collapse in={contentVisible} timeout={300}>
-        <Box
-          sx={{
-            mb: 1,
-            textAlign: 'center',
-            opacity: contentVisible ? 1 : 0,
-            transition: 'opacity 0.3s',
-            // Reserve a minimum height in grid mode so the card doesn't jump when
-            // the label appears (layout mode sits in a fixed grid cell, so no jump)
-            ...(variant === 'grid' ? { minHeight: 40 } : {}),
-          }}
-        >
-          {position && (
-            <>
-              <Typography variant="subtitle2" fontWeight="bold">{position.name}</Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                {position.description}
-              </Typography>
-            </>
-          )}
-        </Box>
-      </Collapse>
+      {/* ── Position label (list view only) ──────────────────────────────── */}
+      {!isLayout && (
+        <Collapse in={contentVisible} timeout={300} sx={{ width: 300, maxWidth: '100%' }}>
+          <Box
+            sx={{
+              mb: 1,
+              textAlign: 'center',
+              opacity: contentVisible ? 1 : 0,
+              transition: 'opacity 0.3s',
+              minHeight: 40,
+            }}
+          >
+            {position && (
+              <>
+                <Typography variant="subtitle2" fontWeight="bold">{position.name}</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  {position.description}
+                </Typography>
+              </>
+            )}
+          </Box>
+        </Collapse>
+      )}
 
       {/* ── Card image ─────────────────────────────────────────────────────── */}
       {/* Outer box: sets dimensions and is the click target */}
@@ -100,8 +105,7 @@ export default function CardItem({
         sx={{
           position: 'relative',
           cursor: 'pointer',
-          // Layout mode expands to fill the CSS grid cell; grid mode uses fixed pixels
-          ...(variant === 'layout'
+          ...(isLayout
             ? { width: '100%', aspectRatio: '200/350' }
             : { width: 200, height: 350 }),
         }}
@@ -139,39 +143,45 @@ export default function CardItem({
         </Box>
       </Box>
 
-      {/* ── Card info ──────────────────────────────────────────────────────── */}
-      {/* Slides in below the card once it has been flipped face-up */}
-      <Collapse in={contentVisible} timeout={300}>
-        <Box
-          sx={{
-            mt: variant === 'layout' ? 1 : 2,
-            textAlign: 'center',
-            opacity: contentVisible ? 1 : 0,
-            transition: 'opacity 0.3s',
-            ...(variant === 'grid' ? { maxWidth: 300 } : {}),
-          }}
-        >
-          <Typography
-            variant="h5"
-            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}
+      {/* ── Position name (grid view) ─────────────────────────────────────── */}
+      {isLayout && position && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 0.75 }}>
+          {position.name}
+        </Typography>
+      )}
+
+      {/* ── Card info (list view only) ─────────────────────────────────────── */}
+      {!isLayout && (
+        <Collapse in={contentVisible} timeout={300} sx={{ width: 300, maxWidth: '100%' }}>
+          <Box
+            sx={{
+              mt: 2,
+              textAlign: 'center',
+              opacity: contentVisible ? 1 : 0,
+              transition: 'opacity 0.3s',
+              maxWidth: 300,
+            }}
           >
-            {card.name}
-            {/* Reversal indicator — only shown for reversed cards */}
-            {card.isReversed ? <AutorenewIcon fontSize="inherit" /> : null}
-          </Typography>
-          <Box sx={{ display: 'block', mt: 1, textWrap: 'balance' }}
-          >
-            {(card.isReversed ? card.keywords_reversed ?? ['N/A'] : card.keywords_upright).map((kw, i) => (
-              <Chip key={i} label={kw.toLowerCase()} size="small" sx={{ bgcolor: 'transparent' }} />
-            ))}
+            <Typography
+              variant="h5"
+              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}
+            >
+              {card.name}
+              {card.isReversed ? <AutorenewIcon fontSize="inherit" /> : null}
+            </Typography>
+            <Box sx={{ display: 'block', mt: 1, textWrap: 'balance' }}>
+              {(card.isReversed ? card.keywords_reversed ?? ['N/A'] : card.keywords_upright).map((kw, i) => (
+                <Chip key={i} label={kw.toLowerCase()} size="small" sx={{ bgcolor: 'transparent' }} />
+              ))}
+            </Box>
+            <Box sx={{ mt: 0.5, display: 'flex', justifyContent: 'center' }}>
+              <IconButton size="small" onClick={() => onInfoClick(card)} aria-label="Card details">
+                <InfoOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Box>
           </Box>
-          <Box sx={{ mt: 0.5, display: 'flex', justifyContent: 'center' }}>
-            <IconButton size="small" onClick={() => onInfoClick(card)} aria-label="Card details">
-              <InfoOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Box>
-        </Box>
-      </Collapse>
+        </Collapse>
+      )}
     </>
   );
 }
