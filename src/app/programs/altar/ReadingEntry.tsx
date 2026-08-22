@@ -9,6 +9,8 @@ import AutorenewIcon from '@mui/icons-material/Autorenew';
 import CloseIcon from '@mui/icons-material/Close';
 import GridViewIcon from '@mui/icons-material/GridView';
 import MenuIcon from '@mui/icons-material/Menu';
+import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
+import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import CardItem from './CardItem';
 import { DEFAULT_FLIP, LAYOUT_CARD_W, LAYOUT_GAP, REVEALED_FLIP, type CardFlipState, type DrawnCard, type SpreadOption, type SpreadPosition } from './tarot-constants';
@@ -214,6 +216,7 @@ export function ReadingEntry({
   onOpenModal: (card: DrawnCard, isReversed: boolean) => void;
 }) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [expanded, setExpanded] = useState(true);
   const hasLayout = reading.kind === 'tarot' && !!reading.spread.layout;
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(hasLayout ? 'grid' : 'list');
   const label = reading.kind === 'tokens' ? reading.label : 'Tarot';
@@ -226,16 +229,12 @@ export function ReadingEntry({
           {label} · {reading.spread.name}
         </Typography>
         <Box sx={{ flex: 1, height: '1px', bgcolor: 'white', mx: 1.5 }} />
-        {reading.kind === 'tokens' && (
-          <IconButton onClick={onRevealAll} title="Reveal all" size="small">
-            <AutorenewIcon fontSize="small" />
-          </IconButton>
-        )}
         <IconButton size="small" onClick={e => setMenuAnchor(e.currentTarget)}>
           <MenuIcon fontSize="small" />
         </IconButton>
       </Box>
 
+      <Collapse in={expanded} timeout={300} sx={{ width: '100%' }}>
       {reading.kind === 'tokens' ? (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'center' }}>
           {reading.tokens.map((token, i) => (
@@ -250,6 +249,7 @@ export function ReadingEntry({
       ) : (
         <TarotContent record={reading} viewMode={viewMode} onOpenModal={onOpenModal} />
       )}
+      </Collapse>
 
       <Menu
         anchorEl={menuAnchor}
@@ -262,6 +262,19 @@ export function ReadingEntry({
         </MenuItem>
         <MenuItem onClick={() => { onMoveDown(); setMenuAnchor(null); }} disabled={isLast} title="Move down" aria-label="Move down" sx={menuItemSx}>
           <ArrowDownwardIcon fontSize="small" />
+        </MenuItem>
+        {reading.kind === 'tokens' && (
+          <MenuItem onClick={() => { onRevealAll(); setMenuAnchor(null); }} title="Reveal all" aria-label="Reveal all" sx={menuItemSx}>
+            <AutorenewIcon fontSize="small" />
+          </MenuItem>
+        )}
+        <MenuItem
+          onClick={() => { setExpanded(e => !e); setMenuAnchor(null); }}
+          title={expanded ? 'Collapse' : 'Expand'}
+          aria-label={expanded ? 'Collapse' : 'Expand'}
+          sx={menuItemSx}
+        >
+          {expanded ? <UnfoldLessIcon fontSize="small" /> : <UnfoldMoreIcon fontSize="small" />}
         </MenuItem>
         <MenuItem onClick={() => { onRemove(); setMenuAnchor(null); }} title="Remove" aria-label="Remove" sx={menuItemSx}>
           <CloseIcon fontSize="small" />

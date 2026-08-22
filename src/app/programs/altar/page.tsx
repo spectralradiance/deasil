@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Box, Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
+import { Box, Button, FormControl, InputLabel, MenuItem, Select, Tab, Tabs, Typography } from '@mui/material';
 import TarotControls from './TarotReading';
 import DivinationControls from './DivinationReading';
 import OracleBrowser from './OracleBrowser';
@@ -10,6 +10,7 @@ import { RUNES, RUNE_AETTS } from './rune-data';
 import { OGHAM, OGHAM_AICMI } from './ogham-data';
 import type { SymbolGroup } from './SymbolBrowser';
 import type { DrawnCard } from './tarot-constants';
+import { motion } from 'framer-motion';
 import { readReadingsFromUrl, writeReadingsToUrl } from './reading-url';
 
 const RUNE_TOKENS: DivinationToken[] = RUNES.map(r => ({
@@ -78,21 +79,19 @@ export default function AltarPage() {
     window.setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleBrowse = () => {
-    setBrowseOpen(open => {
-      if (!open) setBrowseTab(system);
-      return !open;
-    });
-  };
-
   const extraActions = (
-    <Button variant="outlined" onClick={handleSave} disabled={readings.length === 0}>
-      {saved ? 'Saved' : 'Save'}
-    </Button>
+    <>
+      <Button variant="outlined" onClick={() => { setReadings([]); writeReadingsToUrl([]); }} disabled={readings.length === 0}>
+        Clear
+      </Button>
+      <Button variant="outlined" onClick={handleSave} disabled={readings.length === 0}>
+        {saved ? 'Saved' : 'Save'}
+      </Button>
+    </>
   );
 
   const systemSelect = (
-    <FormControl sx={{ minWidth: 130 }} disabled={browseOpen}>
+    <FormControl sx={{ minWidth: 130 }}>
       <InputLabel>Oracle</InputLabel>
       <Select value={system} label="Oracle" onChange={e => setSystem(Number(e.target.value))}>
         <MenuItem value={0}>Tarot</MenuItem>
@@ -104,65 +103,106 @@ export default function AltarPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: 1200, mx: 'auto', p: 3, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
-        {system === 0 && (
-          <TarotControls
-            systemSelector={systemSelect}
-            extraActions={extraActions}
-            browseOpen={browseOpen}
-            onBrowse={handleBrowse}
-            onDraw={data => setReadings(prev => [{ kind: 'tarot', id: nextId.current++, ...data }, ...prev])}
-          />
-        )}
-        {system === 1 && (
-          <DivinationControls
-            tokens={RUNE_TOKENS} spreads={RUNE_SPREADS} canReverse
-            systemSelector={systemSelect} extraActions={extraActions}
-            browseOpen={browseOpen} onBrowse={handleBrowse}
-            onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Runes', tokens, spread, states: new Map() }, ...prev])}
-          />
-        )}
-        {system === 2 && (
-          <DivinationControls
-            tokens={OGHAM_TOKENS} spreads={OGHAM_SPREADS} canReverse
-            systemSelector={systemSelect} extraActions={extraActions}
-            browseOpen={browseOpen} onBrowse={handleBrowse}
-            onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Ogham', tokens, spread, states: new Map() }, ...prev])}
-          />
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+          <Typography variant="h4">Altar</Typography>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={() => setBrowseOpen(false)}
+              aria-pressed={!browseOpen}
+              sx={!browseOpen ? { bgcolor: 'action.selected' } : undefined}
+            >
+              Reading
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                if (!browseOpen) setBrowseTab(system);
+                setBrowseOpen(true);
+              }}
+              aria-pressed={browseOpen}
+              sx={browseOpen ? { bgcolor: 'action.selected' } : undefined}
+            >
+              Browse
+            </Button>
+          </Box>
+        </Box>
+
+        <Box sx={{ display: browseOpen ? 'none' : 'block', width: '100%', mb: 2 }}>
+          {system === 0 && (
+            <TarotControls
+              systemSelector={systemSelect}
+              extraActions={extraActions}
+              onDraw={data => setReadings(prev => [{ kind: 'tarot', id: nextId.current++, ...data }, ...prev])}
+            />
+          )}
+          {system === 1 && (
+            <DivinationControls
+              tokens={RUNE_TOKENS} spreads={RUNE_SPREADS} canReverse
+              systemSelector={systemSelect} extraActions={extraActions}
+              onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Runes', tokens, spread, states: new Map() }, ...prev])}
+            />
+          )}
+          {system === 2 && (
+            <DivinationControls
+              tokens={OGHAM_TOKENS} spreads={OGHAM_SPREADS} canReverse
+              systemSelector={systemSelect} extraActions={extraActions}
+              onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Ogham', tokens, spread, states: new Map() }, ...prev])}
+            />
+          )}
+        </Box>
+
+        {browseOpen && (
+          <Tabs
+            value={browseTab}
+            onChange={(_, value: number) => setBrowseTab(value)}
+            centered
+            sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+          >
+            <Tab label="Tarot" />
+            <Tab label="Runes" />
+            <Tab label="Ogham" />
+          </Tabs>
         )}
 
         {browseOpen && (
           <OracleBrowser
             tab={browseTab}
-            onTabChange={setBrowseTab}
             runeGroups={RUNE_GROUPS}
             oghamGroups={OGHAM_GROUPS}
           />
         )}
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', mt: 4 }}>
+        <Box sx={{ display: browseOpen ? 'none' : 'flex', flexDirection: 'column', gap: 4, width: '100%', mt: 2 }}>
           {readings.map((reading, idx) => (
-            <ReadingEntry
+            <motion.div
               key={reading.id}
-              reading={reading}
-              isFirst={idx === 0}
-              isLast={idx === readings.length - 1}
-              onMoveUp={() => setReadings(prev => { const a = [...prev]; [a[idx], a[idx - 1]] = [a[idx - 1], a[idx]]; return a; })}
-              onMoveDown={() => setReadings(prev => { const a = [...prev]; [a[idx], a[idx + 1]] = [a[idx + 1], a[idx]]; return a; })}
-              onRemove={() => setReadings(prev => prev.filter(r => r.id !== reading.id))}
-              onReveal={i => setReadings(prev => prev.map(r => r.id !== reading.id || r.kind !== 'tokens' ? r : { ...r, states: new Map(r.states).set(i, { revealed: true, infoOpen: false }) }))}
-              onToggleInfo={i => setReadings(prev => prev.map(r => {
-                if (r.id !== reading.id || r.kind !== 'tokens') return r;
-                const s = r.states.get(i) ?? { revealed: false, infoOpen: false };
-                return { ...r, states: new Map(r.states).set(i, { ...s, infoOpen: !s.infoOpen }) };
-              }))}
-              onRevealAll={() => setReadings(prev => prev.map(r => {
-                if (r.id !== reading.id || r.kind !== 'tokens') return r;
-                const next = new Map<number, TokenState>();
-                r.tokens.forEach((_, i) => next.set(i, { revealed: true, infoOpen: true }));
-                return { ...r, states: next };
-              }))}
-              onOpenModal={(card, isReversed) => { setModalCard(card); setModalIsReversed(isReversed); }}
-            />
+              layout
+              transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+              style={{ width: '100%' }}
+            >
+              <ReadingEntry
+                reading={reading}
+                isFirst={idx === 0}
+                isLast={idx === readings.length - 1}
+                onMoveUp={() => setReadings(prev => { const a = [...prev]; [a[idx], a[idx - 1]] = [a[idx - 1], a[idx]]; return a; })}
+                onMoveDown={() => setReadings(prev => { const a = [...prev]; [a[idx], a[idx + 1]] = [a[idx + 1], a[idx]]; return a; })}
+                onRemove={() => setReadings(prev => prev.filter(r => r.id !== reading.id))}
+                onReveal={i => setReadings(prev => prev.map(r => r.id !== reading.id || r.kind !== 'tokens' ? r : { ...r, states: new Map(r.states).set(i, { revealed: true, infoOpen: false }) }))}
+                onToggleInfo={i => setReadings(prev => prev.map(r => {
+                  if (r.id !== reading.id || r.kind !== 'tokens') return r;
+                  const s = r.states.get(i) ?? { revealed: false, infoOpen: false };
+                  return { ...r, states: new Map(r.states).set(i, { ...s, infoOpen: !s.infoOpen }) };
+                }))}
+                onRevealAll={() => setReadings(prev => prev.map(r => {
+                  if (r.id !== reading.id || r.kind !== 'tokens') return r;
+                  const next = new Map<number, TokenState>();
+                  r.tokens.forEach((_, i) => next.set(i, { revealed: true, infoOpen: true }));
+                  return { ...r, states: next };
+                }))}
+                onOpenModal={(card, isReversed) => { setModalCard(card); setModalIsReversed(isReversed); }}
+              />
+            </motion.div>
           ))}
         </Box>
 

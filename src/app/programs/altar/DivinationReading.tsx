@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import {
   Box, Button, Checkbox, FormControl, FormControlLabel,
-  InputLabel, MenuItem, Select, Typography,
+  InputLabel, MenuItem, Select,
 } from '@mui/material';
 import { type DivinationToken, type DrawSpread, type DrawnToken } from './ReadingEntry';
 
@@ -12,12 +12,10 @@ interface Props {
   canReverse?: boolean;
   systemSelector?: React.ReactNode;
   extraActions?: React.ReactNode;
-  browseOpen: boolean;
-  onBrowse: () => void;
   onDraw: (tokens: DrawnToken[], spread: DrawSpread) => void;
 }
 
-export default function DivinationControls({ tokens, spreads, canReverse = false, systemSelector, extraActions, browseOpen, onBrowse, onDraw }: Props) {
+export default function DivinationControls({ tokens, spreads, canReverse = false, systemSelector, extraActions, onDraw }: Props) {
   const [selectedSpread, setSelectedSpread] = useState(spreads[0]);
   const [allowReversals, setAllowReversals] = useState(false);
 
@@ -34,33 +32,27 @@ export default function DivinationControls({ tokens, spreads, canReverse = false
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-        <Typography variant="h4">Altar</Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-        {systemSelector}
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', flexWrap: 'wrap', gap: 2 }}>
+      {systemSelector}
 
-        <FormControl sx={{ minWidth: 180 }} disabled={browseOpen}>
-          <InputLabel>Spread</InputLabel>
-          <Select value={selectedSpread.name} label="Spread"
-            onChange={e => setSelectedSpread(spreads.find(s => s.name === e.target.value)!)}
-          >
-            {spreads.map(s => <MenuItem key={s.name} value={s.name}>{s.name} ({s.count})</MenuItem>)}
-          </Select>
-        </FormControl>
+      <FormControl sx={{ minWidth: 180 }}>
+        <InputLabel>Spread</InputLabel>
+        <Select value={selectedSpread.name} label="Spread"
+          onChange={e => setSelectedSpread(spreads.find(s => s.name === e.target.value)!)}
+        >
+          {spreads.map(s => <MenuItem key={s.name} value={s.name}>{s.name} ({s.count})</MenuItem>)}
+        </Select>
+      </FormControl>
 
-        {canReverse && (
-          <FormControlLabel
-            control={<Checkbox checked={allowReversals} onChange={e => setAllowReversals(e.target.checked)} disabled={browseOpen} />}
-            label="Reversals"
-          />
-        )}
+      {canReverse && (
+        <FormControlLabel
+          control={<Checkbox checked={allowReversals} onChange={e => setAllowReversals(e.target.checked)} />}
+          label="Reversals"
+        />
+      )}
 
-        <Button variant="outlined" onClick={draw} disabled={browseOpen}>Draw</Button>
-        <Button variant="outlined" onClick={onBrowse} aria-pressed={browseOpen}>Browse</Button>
-        {extraActions}
-        </Box>
-      </Box>
+      <Button variant="outlined" onClick={draw}>Draw</Button>
+      {extraActions}
     </Box>
   );
 }

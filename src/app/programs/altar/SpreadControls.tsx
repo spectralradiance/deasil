@@ -1,7 +1,7 @@
 "use client";
 import {
   Box, Button, Checkbox, FormControl, FormControlLabel,
-  InputLabel, MenuItem, Select, TextField, Typography,
+  InputLabel, MenuItem, Select, TextField,
 } from '@mui/material';
 import { enrichedCards } from './tarot-data';
 import NumberField from '../../components/NumberField';
@@ -23,8 +23,6 @@ interface SpreadControlsProps {
   isClearing: boolean;
   onDraw: () => void;
   onClear: () => void;
-  onBrowse: () => void;
-  browseOpen: boolean;
   systemSelector?: React.ReactNode;
   extraActions?: React.ReactNode;
 }
@@ -53,30 +51,24 @@ export default function SpreadControls({
   isClearing,
   onDraw,
   onClear,
-  onBrowse,
-  browseOpen,
   systemSelector,
   extraActions,
 }: SpreadControlsProps) {
-  // Locked while cards are showing, clearing, or the catalog is open
-  const locked = drawnCards.length > 0 || isClearing || browseOpen;
+  // Controls are locked once cards are on the table or during the clear animation
+  const locked = drawnCards.length > 0 || isClearing;
 
   return (
     <>
-      {/* ── Main controls bar ────────────────────────────────────────────── */}
       <Box
         sx={{
-          mb: 2,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'center',
           width: '100%',
           flexWrap: 'wrap',
           gap: 2,
         }}
       >
-        <Typography variant="h4">Altar</Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         {systemSelector}
 
         {/* Spread type selector */}
@@ -123,12 +115,10 @@ export default function SpreadControls({
 
         {/* Draw / Clear — mutually exclusive based on whether cards are showing */}
         {drawnCards.length > 0
-          ? <Button variant="outlined" onClick={onClear} disabled={isClearing || browseOpen}>Clear</Button>
-          : <Button variant="outlined" onClick={onDraw} disabled={isClearing || browseOpen}>Draw</Button>
+          ? <Button variant="outlined" onClick={onClear} disabled={isClearing}>Clear</Button>
+          : <Button variant="outlined" onClick={onDraw} disabled={isClearing}>Draw</Button>
         }
-        <Button variant="outlined" onClick={onBrowse} aria-pressed={browseOpen}>Browse</Button>
         {extraActions}
-        </Box>
       </Box>
 
       {/* ── Custom positions textarea ─────────────────────────────────────── */}
@@ -142,7 +132,7 @@ export default function SpreadControls({
           onChange={(e) => onCustomPositionTextChange(e.target.value)}
           placeholder={`Position 1 - Description\nPosition 2 - Description\n...`}
           disabled={locked}
-          sx={{ width: 400, maxWidth: '100%', mt: 2 }}
+          sx={{ width: 400, maxWidth: '100%', mt: 2, mx: 'auto', display: 'block' }}
         />
       )}
     </>

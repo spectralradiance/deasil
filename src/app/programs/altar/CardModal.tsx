@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import {
   Box, Typography, IconButton, Dialog, DialogContent,
@@ -54,8 +54,9 @@ interface CardModalProps {
 /**
  * Full-detail dialog for a single drawn tarot card.
  *
- * Layout: two-column — card image on the left (fills the full dialog height),
- * scrollable detail content on the right.
+ * Layout: two-column on desktop — card image on the left (fills the full dialog
+ * height), scrollable detail content on the right. On mobile the same content
+ * stacks in a single scrolling column (image above text).
  *
  * Right-panel sections (in order):
  * 1. Card name + close button
@@ -78,6 +79,41 @@ export default function CardModal({ modalCard, modalIsReversed, onClose }: CardM
   // Display indices for array-valued fields; randomised to a fresh entry on each open
   const [fortuneIndex, setFortuneIndex] = useState(0);
   const [questionsIndex, setQuestionsIndex] = useState(0);
+
+  // Lock the page behind the dialog. MUI's built-in lock only sets overflow on
+  // body, which is not enough here (html also scrolls; iOS ignores overflow).
+  useEffect(() => {
+    const html = document.documentElement;
+    const { overflow: htmlOverflow, overscrollBehavior: htmlOverscroll } = html.style;
+    const {
+      overflow: bodyOverflow, overscrollBehavior: bodyOverscroll,
+      position, top, left, right, width,
+    } = document.body.style;
+    const scrollY = window.scrollY;
+
+    html.style.overflow = 'hidden';
+    html.style.overscrollBehavior = 'none';
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+
+    return () => {
+      html.style.overflow = htmlOverflow;
+      html.style.overscrollBehavior = htmlOverscroll;
+      document.body.style.overflow = bodyOverflow;
+      document.body.style.overscrollBehavior = bodyOverscroll;
+      document.body.style.position = position;
+      document.body.style.top = top;
+      document.body.style.left = left;
+      document.body.style.right = right;
+      document.body.style.width = width;
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
 
   /**
    * Select a chip: move it to the opened section and randomise its start index
@@ -151,17 +187,39 @@ export default function CardModal({ modalCard, modalIsReversed, onClose }: CardM
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{ sx: { height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column' } }}
+      disableScrollLock
+      slotProps={{ backdrop: { sx: { touchAction: 'none' } } }}
+      PaperProps={{
+        sx: {
+          height: '90vh',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overscrollBehavior: 'contain',
+        },
+      }}
     >
-      <DialogContent sx={{ padding: '0 !important', display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <DialogContent
+        sx={{
+          padding: '0 !important',
+          display: 'flex',
+          flex: 1,
+          minHeight: 0,
+          flexDirection: { xs: 'column', md: 'row' },
+          overflow: { xs: 'auto', md: 'hidden' },
+          overscrollBehavior: 'contain',
+        }}
+      >
 
-        {/* ── Left: full-height card image ────────────────────────────────── */}
+        {/* ── Card image: full-height left column on desktop, stacked on mobile ── */}
         <Box
           sx={{
-            width: '50%',
+            width: { xs: '100%', md: '50%' },
+            aspectRatio: { xs: '4 / 7', md: 'unset' },
             flexShrink: 0,
             position: 'relative',
-            borderRight: 1,
+            borderRight: { xs: 0, md: 1 },
+            borderBottom: { xs: 1, md: 0 },
             borderColor: 'divider',
           }}
         >
@@ -173,8 +231,8 @@ export default function CardModal({ modalCard, modalIsReversed, onClose }: CardM
           />
         </Box>
 
-        {/* ── Right: scrollable card detail ───────────────────────────────── */}
-        <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
+        {/* ── Card detail: right column on desktop, below the image on mobile ── */}
+        <Box sx={{ flex: { xs: 'none', md: 1 }, overflowY: { xs: 'visible', md: 'auto' }, p: 2 }}>
 
           {/* Title + close button */}
           <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>

@@ -83,7 +83,7 @@ export default function PhotosPage() {
   if (loading) {
     return (
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
-        <h1>Photos</h1>
+        <h1>Photography</h1>
         <p>Loading...</p>
       </main>
     );
@@ -91,7 +91,7 @@ export default function PhotosPage() {
 
   return (
     <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
-      <h1>Photos</h1>
+      <h1>Photography</h1>
       {folders.map((folder) => (
         <section key={folder._id} style={{ marginTop: 40 }}>
           <h2 style={{ marginBottom: 16 }}>{folder.title}</h2>

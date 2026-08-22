@@ -6,11 +6,9 @@ import { SPREADS, type DrawnCard, type SpreadOption, type SpreadPosition } from 
 import SpreadControls from './SpreadControls';
 import { type TarotReadingRecord } from './ReadingEntry';
 
-export default function TarotControls({ systemSelector, extraActions, browseOpen, onBrowse, onDraw }: {
+export default function TarotControls({ systemSelector, extraActions, onDraw }: {
   systemSelector?: React.ReactNode;
   extraActions?: React.ReactNode;
-  browseOpen: boolean;
-  onBrowse: () => void;
   onDraw: (data: Omit<TarotReadingRecord, 'id' | 'kind'>) => void;
 }) {
   const [selectedSpread, setSelectedSpread] = useState<SpreadOption>(SPREADS[0]);
@@ -50,8 +48,6 @@ export default function TarotControls({ systemSelector, extraActions, browseOpen
           isClearing={false}
           onDraw={draw}
           onClear={() => {}}
-          onBrowse={onBrowse}
-          browseOpen={browseOpen}
           systemSelector={systemSelector}
           extraActions={extraActions}
         />
