@@ -18,17 +18,24 @@ interface Post {
   slug: {
     current: string;
   };
+  description: string;
+  categories: {
+    title: string;
+    slug: {
+      current: string;
+    };
+  }[];
   mainImage: any;
-  body: any;
 }
 
 async function getPosts() {
-  const posts = await client.fetch<Post[]>(`*[_type == "post"]{
+  const posts = await client.fetch<Post[]>(`*[_type == "post"] | order(publishedAt desc){
     _id,
     title,
     slug,
-    mainImage,
-    body
+    description,
+    categories[]->{title, slug},
+    mainImage
   }`);
   return posts;
 }
@@ -45,12 +52,15 @@ export default function WritingPage() {
   }, []);
 
   return (
-    <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', mt: 4 }}>
-      <Box sx={{ width: '100%', maxWidth: 1200, display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'space-between' }}>
+    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 4 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Writing
+      </Typography>
+      <Box sx={{ width: '100%', maxWidth: 1200, display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'space-between', mt: 2 }}>
         {articles.map((article) => (
-          <Card key={article._id} sx={{ width: 380, borderRadius: 0 }}>
+          <Card key={article._id} elevation={0} sx={{ width: 380, borderRadius: 0, bgcolor: 'transparent', backgroundImage: 'none', boxShadow: 'none' }}>
             <Link href={`/writing/${article.slug.current}`} passHref>
-              <CardActionArea component="a">
+              <CardActionArea component="a" sx={{ bgcolor: 'transparent', backgroundImage: 'none' }}>
                 {article.mainImage && (
                   <CardMedia
                     component="img"
@@ -59,10 +69,20 @@ export default function WritingPage() {
                     alt={article.title}
                   />
                 )}
-                <CardContent>
+                <CardContent sx={{ px: 0 }}>
                   <Typography gutterBottom variant="h6" component="div">
                     {article.title}
                   </Typography>
+                  {article.description && (
+                    <Typography variant="body2" color="text.secondary">
+                      {article.description}
+                    </Typography>
+                  )}
+                  {article.categories?.length > 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+                      {article.categories.map(cat => cat.title).join(', ')}
+                    </Typography>
+                  )}
                 </CardContent>
               </CardActionArea>
             </Link>
