@@ -1,14 +1,15 @@
 'use client';
-import { useRef, useState } from 'react';
-import { Box, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
+import { Box, Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import TarotControls from './TarotReading';
 import DivinationControls from './DivinationReading';
-import { ReadingEntry, type AnyReading, type DivinationToken, type DrawSpread, type DrawnToken, type TokenState } from './ReadingEntry';
+import { ReadingEntry, type AnyReading, type DivinationToken, type DrawSpread, type TokenState } from './ReadingEntry';
 import CardModal from './CardModal';
 import { RUNES, RUNE_AETTS } from './rune-data';
 import { OGHAM, OGHAM_AICMI } from './ogham-data';
 import type { SymbolGroup } from './SymbolBrowser';
 import type { DrawnCard } from './tarot-constants';
+import { readReadingsFromUrl, writeReadingsToUrl } from './reading-url';
 
 const RUNE_TOKENS: DivinationToken[] = RUNES.map(r => ({
   id: r.name, symbol: r.symbol, name: r.name,
@@ -58,7 +59,27 @@ export default function AltarPage() {
   const [readings, setReadings] = useState<AnyReading[]>([]);
   const [modalCard, setModalCard] = useState<DrawnCard | null>(null);
   const [modalIsReversed, setModalIsReversed] = useState(false);
+  const [saved, setSaved] = useState(false);
   const nextId = useRef(0);
+
+  useEffect(() => {
+    const restored = readReadingsFromUrl();
+    if (!restored.length) return;
+    setReadings(restored);
+    nextId.current = restored.length;
+  }, []);
+
+  const handleSave = () => {
+    writeReadingsToUrl(readings);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2000);
+  };
+
+  const extraActions = (
+    <Button variant="outlined" onClick={handleSave} disabled={readings.length === 0}>
+      {saved ? 'Saved' : 'Save'}
+    </Button>
+  );
 
   const systemSelect = (
     <FormControl sx={{ minWidth: 130 }}>
@@ -76,20 +97,21 @@ export default function AltarPage() {
         {system === 0 && (
           <TarotControls
             systemSelector={systemSelect}
+            extraActions={extraActions}
             onDraw={data => setReadings(prev => [{ kind: 'tarot', id: nextId.current++, ...data }, ...prev])}
           />
         )}
         {system === 1 && (
           <DivinationControls
             tokens={RUNE_TOKENS} spreads={RUNE_SPREADS} canReverse
-            systemSelector={systemSelect} browseGroups={RUNE_GROUPS}
+            systemSelector={systemSelect} extraActions={extraActions} browseGroups={RUNE_GROUPS}
             onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Runes', tokens, spread, states: new Map() }, ...prev])}
           />
         )}
         {system === 2 && (
           <DivinationControls
             tokens={OGHAM_TOKENS} spreads={OGHAM_SPREADS} canReverse
-            systemSelector={systemSelect} browseGroups={OGHAM_GROUPS}
+            systemSelector={systemSelect} extraActions={extraActions} browseGroups={OGHAM_GROUPS}
             onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Ogham', tokens, spread, states: new Map() }, ...prev])}
           />
         )}

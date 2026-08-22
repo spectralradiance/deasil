@@ -26,6 +26,7 @@ interface SpreadControlsProps {
   onBrowse: () => void;
   browseOpen: boolean;
   systemSelector?: React.ReactNode;
+  extraActions?: React.ReactNode;
 }
 
 /**
@@ -55,6 +56,7 @@ export default function SpreadControls({
   onBrowse,
   browseOpen,
   systemSelector,
+  extraActions,
 }: SpreadControlsProps) {
   // Controls are locked once cards are on the table or during the clear animation
   const locked = drawnCards.length > 0 || isClearing;
@@ -125,6 +127,7 @@ export default function SpreadControls({
           : <Button variant="outlined" onClick={onDraw} disabled={isClearing}>Draw</Button>
         }
         <Button variant="text" onClick={onBrowse} color={browseOpen ? 'primary' : 'inherit'}>Browse</Button>
+        {extraActions}
         </Box>
       </Box>
 

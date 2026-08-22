@@ -12,11 +12,12 @@ interface Props {
   spreads: DrawSpread[];
   canReverse?: boolean;
   systemSelector?: React.ReactNode;
+  extraActions?: React.ReactNode;
   browseGroups?: SymbolGroup[];
   onDraw: (tokens: DrawnToken[], spread: DrawSpread) => void;
 }
 
-export default function DivinationControls({ tokens, spreads, canReverse = false, systemSelector, browseGroups, onDraw }: Props) {
+export default function DivinationControls({ tokens, spreads, canReverse = false, systemSelector, extraActions, browseGroups, onDraw }: Props) {
   const [browseOpen, setBrowseOpen] = useState(false);
   const [selectedSpread, setSelectedSpread] = useState(spreads[0]);
   const [allowReversals, setAllowReversals] = useState(false);
@@ -66,6 +67,7 @@ export default function DivinationControls({ tokens, spreads, canReverse = false
             Browse
           </Box>
         )}
+        {extraActions}
         </Box>
       </Box>
       {browseOpen && browseGroups && <SymbolBrowser groups={browseGroups} />}
