@@ -90,14 +90,16 @@ export default function SundialPage() {
         timezone={timezone}
         onPauseToggle={() => setPaused(p => !p)}
         onCalendarOpen={() => setCalendarOpen(true)}
-        onToggle24h={() => { const v = !use24h; setUse24h(v); localStorage.setItem('sundial-24h', String(v)); }}
-        onToggleDMY={() => { const v = !useDMY; setUseDMY(v); localStorage.setItem('sundial-dmy', String(v)); }}
         onLocationOpen={() => setLocationOpen(true)}
       />
 
       <CalendarDialog
         open={calendarOpen}
         initialTime={time}
+        use24h={use24h}
+        useDMY={useDMY}
+        onUse24hChange={(v) => { setUse24h(v); localStorage.setItem('sundial-24h', String(v)); }}
+        onUseDMYChange={(v) => { setUseDMY(v); localStorage.setItem('sundial-dmy', String(v)); }}
         onAccept={(date) => { setTime(date); setPaused(true); }}
         onClose={() => setCalendarOpen(false)}
       />

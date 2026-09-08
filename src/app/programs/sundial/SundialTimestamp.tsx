@@ -1,7 +1,7 @@
-// Live timestamp display (ms precision) with pause, date-picker, 12/24h, M/D format, and location controls.
+// Live timestamp display (ms precision) with pause, date-picker, and location controls.
 
 'use client';
-import { Box, Button, IconButton, Typography } from '@mui/material';
+import { Box, IconButton, Typography } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
@@ -29,14 +29,12 @@ interface Props {
   timezone: string;
   onPauseToggle: () => void;
   onCalendarOpen: () => void;
-  onToggle24h: () => void;
-  onToggleDMY: () => void;
   onLocationOpen: () => void;
 }
 
 export default function SundialTimestamp({
   time, use24h, useDMY, paused, coords, timezone,
-  onPauseToggle, onCalendarOpen, onToggle24h, onToggleDMY, onLocationOpen,
+  onPauseToggle, onCalendarOpen, onLocationOpen,
 }: Props) {
   const { year, month, day, hours, minutes, seconds, milliseconds } = formatTime(time);
   const displayHours = use24h ? hours : ((time.getHours() % 12) || 12).toString().padStart(2, '0');
@@ -68,14 +66,6 @@ export default function SundialTimestamp({
           <IconButton size="small" onClick={onCalendarOpen} title="Pick date & time">
             <CalendarMonthIcon />
           </IconButton>
-          <Button size="small" onClick={onToggle24h}
-            sx={{ minWidth: 0, px: 1, textTransform: 'none', fontSize: '0.75rem' }}>
-            {use24h ? '24h' : '12h'}
-          </Button>
-          <Button size="small" onClick={onToggleDMY}
-            sx={{ minWidth: 0, px: 1, textTransform: 'none', fontSize: '0.75rem' }}>
-            {useDMY ? 'D/M' : 'M/D'}
-          </Button>
         </Box>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
