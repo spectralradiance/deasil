@@ -10,6 +10,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { useTheme } from '@mui/material';
 import RadialClock, { ColorStop, RingIcon, RingLabel, RingSector } from './RadialClock';
 
 // ---- Solar event descriptions -------------------------------
@@ -88,8 +89,15 @@ interface DailyClockProps {
 }
 
 export const DailyClock: React.FC<DailyClockProps> = ({ date, sunrise, sunset, onIconClick, activeIconIndex }) => {
+  const theme = useTheme();
+
   // Hand position: fraction of 24h day
   const handPos = dateToFraction(date);
+
+  // Render icons as flat silhouettes: white in dark mode, black in light mode.
+  const iconFilterStyle = theme.palette.mode === 'dark'
+    ? 'brightness(0) invert(1)'
+    : 'brightness(0)';
 
   // Solar noon = midpoint of sunrise/sunset; solar midnight = noon + 12h
   const solarNoon = useMemo(
@@ -118,25 +126,25 @@ export const DailyClock: React.FC<DailyClockProps> = ({ date, sunrise, sunset, o
     if (sunrise) list.push({
       pos: dateToFraction(sunrise),
       href: '/sundial/day/sunrise.svg',
-      color: '#FFD700',       // dawn gold
+      filterStyle: iconFilterStyle,
     });
     if (solarNoon) list.push({
       pos: dateToFraction(solarNoon),
       href: '/sundial/day/noon.svg',
-      color: '#fafad2',       // noon pale-yellow
+      filterStyle: iconFilterStyle,
     });
     if (sunset) list.push({
       pos: dateToFraction(sunset),
       href: '/sundial/day/sunset.svg',
-      color: '#FF8C00',       // dusk orange
+      filterStyle: iconFilterStyle,
     });
     if (solarMidnight) list.push({
       pos: dateToFraction(solarMidnight),
       href: '/sundial/day/midnight.svg',
-      color: '#0000ff',       // midnight blue
+      filterStyle: iconFilterStyle,
     });
     return list;
-  }, [sunrise, solarNoon, sunset, solarMidnight]);
+  }, [sunrise, solarNoon, sunset, solarMidnight, iconFilterStyle]);
 
   return (
     <RadialClock
