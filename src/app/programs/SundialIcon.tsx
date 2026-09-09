@@ -5,9 +5,9 @@ const SundialIcon = () => (
       backgroundColor: 'currentColor',
       display: 'inline-block',
       flexShrink: 0,
-      height: 24,
+      height: 40,
       mask: 'url(/program-icons/sundial.svg) center / contain no-repeat',
-      width: 24,
+      width: 40,
     }}
   />
 );

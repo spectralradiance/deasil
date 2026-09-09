@@ -18,8 +18,8 @@ export default function ProgramsPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', borderRadius: '8px' }}>
               {program.icon}
               <div>
-                <div style={{ fontWeight: 600 }}>{program.title}</div>
-                <div style={{ fontSize: '0.85em', opacity: 0.65, marginTop: 2 }}>{program.description}</div>
+                <div style={{ fontWeight: 600, fontSize: '1.3em' }}>{program.title}</div>
+                <div style={{ fontSize: '1em', opacity: 0.65, marginTop: 2 }}>{program.description}</div>
               </div>
             </div>
           </Link>
