@@ -1,30 +1,53 @@
-// Wheel of the Year section: sabbat position hand + slide-in panel with days since/until each sabbat.
+// Wheel of the Year section: sabbat position hand + slide-in panel listing all 8 sabbats, each
+// expandable into its long description and next/last occurrence.
 
 'use client';
 import { useState, useMemo } from 'react';
 import { Box, IconButton, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { YearClock, SABBAT_DATA, dayOfYearToFraction } from './YearClock';
-import { getNearestSabbats } from '../lib/astro';
+import PhaseInfoPanel, { PhaseRowData } from './PhaseInfoPanel';
+import { getSabbatOccurrence, getNearestSabbats } from '../lib/astro';
 import { clockBoxSx, infoPanelSx, infoPanelContentSx } from '../lib/sundial-layout';
 
 interface Props {
   time: Date;
+  use24h: boolean;
 }
 
-export default function YearClockSection({ time }: Props) {
+const SEASON_BY_SABBAT_IDX = ['Autumn', 'Winter', 'Winter', 'Spring', 'Spring', 'Summer', 'Summer', 'Autumn'];
+
+export default function YearClockSection({ time, use24h }: Props) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
 
   const [y, mo, d] = [time.getFullYear(), time.getMonth(), time.getDate()];
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const currentIdx = useMemo(() => Math.floor(dayOfYearToFraction(time) * 8) % 8, [y, mo, d]);
+  const { current } = getNearestSabbats(time);
+
+  const phases: PhaseRowData[] = useMemo(() => {
+    return SABBAT_DATA.map(sab => {
+      const { next, last } = getSabbatOccurrence(sab.name, time);
+      return {
+        name: sab.name,
+        description: sab.description,
+        next,
+        last,
+      };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [y, mo, d]);
+
   const displayIdx = selectedIdx ?? currentIdx;
-  const { current, last, next } = getNearestSabbats(time);
+
+  const season = SEASON_BY_SABBAT_IDX[currentIdx];
+  const daysIntoSeason = Math.floor((time.getTime() - phases[currentIdx].last.getTime()) / 86400000);
+  const yearPercent = dayOfYearToFraction(time) * 100;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, width: { xs: '100%', md: 'fit-content' } }}>
-      <Box sx={clockBoxSx(infoOpen)} onClick={() => setInfoOpen(true)} style={{ cursor: 'pointer' }}>
+      <Box sx={clockBoxSx()} onClick={() => setInfoOpen(true)} style={{ cursor: 'pointer' }}>
         <YearClock
           date={time}
           activeIconIndex={displayIdx}
@@ -40,36 +63,25 @@ export default function YearClockSection({ time }: Props) {
           </Box>
           <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 0.5 }}>Seasons</Typography>
           {current && (
-            <Typography variant="body2">Today is <strong>{current}</strong>!</Typography>
-          )}
-          {last && (
-            <Typography variant="body2">
-              {last.daysAgo} day{last.daysAgo !== 1 ? 's' : ''} since <strong>{last.name}</strong>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Today is <strong>{current}</strong>!
             </Typography>
           )}
-          {next && (
-            <Typography variant="body2">
-              {next.daysUntil} day{next.daysUntil !== 1 ? 's' : ''} until <strong>{next.name}</strong>
-            </Typography>
-          )}
-          <Typography variant="subtitle1" sx={{ mt: 1, fontWeight: 500 }}>
-            {SABBAT_DATA[displayIdx].name}
-            <Typography component="span" variant="body2" sx={{ ml: 1, color: 'text.secondary' }}>
-              {SABBAT_DATA[displayIdx].dateLabel}
-            </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>Season: {season}</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            {daysIntoSeason} day{daysIntoSeason !== 1 ? 's' : ''} into {season}
           </Typography>
-          <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
-            {SABBAT_DATA[displayIdx].description}
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+            {yearPercent.toFixed(1)}% through the wheel
           </Typography>
-          {selectedIdx !== null && (
-            <Typography
-              variant="caption"
-              sx={{ display: 'block', mt: 1, cursor: 'pointer', color: 'text.secondary' }}
-              onClick={() => setSelectedIdx(null)}
-            >
-              ← back to current sabbat
-            </Typography>
-          )}
+          <PhaseInfoPanel
+            phases={phases}
+            selectedIdx={displayIdx}
+            onSelect={(i) => setSelectedIdx(prev => prev === i ? null : i)}
+            activeIdx={currentIdx}
+            now={time}
+            use24h={use24h}
+          />
         </Box>
       </Box>
     </Box>

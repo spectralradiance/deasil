@@ -113,9 +113,9 @@ export default function SundialPage() {
       />
 
       <DailyClockSection time={time} sunTimes={sunTimes} use24h={use24h} coords={coords} />
-      <MoonClockSection  time={time} />
-      <YearClockSection  time={time} />
-      <AstroClockSection time={time} />
+      <MoonClockSection  time={time} use24h={use24h} />
+      <YearClockSection  time={time} use24h={use24h} />
+      <AstroClockSection time={time} use24h={use24h} />
     </Box>
   );
 }
