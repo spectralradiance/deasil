@@ -15,7 +15,7 @@ export default function AboutPage() {
           About Deasil
         </Typography>
         <Typography variant="body1" align="center" sx={{ maxWidth: 600, mx: 'auto' }}>
-          Deasil is a digital space for exploration and creation. This is a place to share writings, photography, and interactive programs. The name 'Deasil' means to move in a sunwise or clockwise direction, representing a path of positive and natural progression.
+          Deasil is a digital space for exploration and creation. This is a place to share writings, photography, and interactive programs. The name &lsquo;Deasil&rsquo; means to move in a sunwise or clockwise direction, representing a path of positive and natural progression.
         </Typography>
       </Box>
     </Box>

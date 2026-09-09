@@ -9,6 +9,9 @@ import remarkGfm from 'remark-gfm';
 import { portableTextToMarkdown } from '@portabletext/markdown';
 import Link from "next/link";
 import TableOfContents from './TableOfContents';
+import type { SanityImageSource } from '@sanity/image-url';
+import type { PortableTextBlock } from '@portabletext/types';
+import type { Components } from 'react-markdown';
 
 const slugify = (text: string) =>
   text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
@@ -17,7 +20,7 @@ const slugify = (text: string) =>
 const nodeText = (children: React.ReactNode): string =>
   React.Children.toArray(children).map(c => (typeof c === 'string' ? c : '')).join('');
 
-const headingComponents = {
+const headingComponents: Components = {
   h2: ({ children }: { children?: React.ReactNode }) => <h2 id={slugify(nodeText(children))}>{children}</h2>,
   h3: ({ children }: { children?: React.ReactNode }) => <h3 id={slugify(nodeText(children))}>{children}</h3>,
   h4: ({ children }: { children?: React.ReactNode }) => <h4 id={slugify(nodeText(children))}>{children}</h4>,
@@ -27,7 +30,7 @@ const headingComponents = {
 
 const builder = imageUrlBuilder(client);
 
-function urlFor(source: any) {
+function urlFor(source: SanityImageSource) {
   return builder.image(source);
 }
 
@@ -51,8 +54,8 @@ interface Post {
       current: string;
     };
   }[];
-  mainImage: any;
-  body: any;
+  mainImage: SanityImageSource;
+  body: PortableTextBlock[];
 }
 
 async function getPost(slug: string) {
@@ -143,7 +146,7 @@ export default function ArticleDetailPage() {
           </Card>
         )}
         {article.body && (
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={headingComponents as any}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={headingComponents}>
             {portableTextToMarkdown(article.body)}
           </ReactMarkdown>
         )}

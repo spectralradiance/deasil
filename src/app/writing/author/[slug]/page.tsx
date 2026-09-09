@@ -4,10 +4,12 @@ import { client } from "../../../sanity-client";
 import Link from "next/link";
 import imageUrlBuilder from "@sanity/image-url";
 import { PortableText } from "@portabletext/react";
+import type { SanityImageSource } from "@sanity/image-url";
+import type { PortableTextBlock } from "@portabletext/types";
 
 const builder = imageUrlBuilder(client);
 
-function urlFor(source: any) {
+function urlFor(source: SanityImageSource) {
   return builder.image(source);
 }
 
@@ -17,13 +19,13 @@ interface Post {
   slug: {
     current: string;
   };
-  mainImage: any;
+  mainImage: SanityImageSource;
 }
 
 interface Author {
   name: string;
-  image: any;
-  bio: any;
+  image: SanityImageSource;
+  bio: PortableTextBlock[];
 }
 
 async function getAuthor(slug: string) {

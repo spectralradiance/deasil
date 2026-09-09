@@ -5,6 +5,7 @@ import {
   Dialog, DialogTitle, DialogContent, useMediaQuery, useTheme,
 } from '@mui/material';
 import { TocContext } from '../../TocContext';
+import type { PortableTextBlock } from '@portabletext/types';
 import TocIcon from '@mui/icons-material/Toc';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -17,7 +18,7 @@ interface Heading {
 }
 
 interface TableOfContentsProps {
-  body: any[];
+  body: PortableTextBlock[];
 }
 
 const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
@@ -33,10 +34,21 @@ const TableOfContents: React.FC<TableOfContentsProps> = ({ body }) => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   useEffect(() => {
-    setHeadings(body.filter(
-      (block) => block._type === 'block' && block.style &&
-        (block.style.startsWith('h2') || block.style.startsWith('h3') || block.style.startsWith('h4'))
-    ));
+    setHeadings(
+      body
+        .filter(
+          (block) => block._type === 'block' && block.style &&
+            (block.style.startsWith('h2') || block.style.startsWith('h3') || block.style.startsWith('h4'))
+        )
+        .map((block) => ({
+          _key: block._key ?? '',
+          style: block.style as string,
+          // Heading spans always carry text; anything else contributes nothing.
+          children: (block.children ?? []).map((child) => ({
+            text: typeof child.text === 'string' ? child.text : '',
+          })),
+        }))
+    );
   }, [body]);
 
   useEffect(() => () => {

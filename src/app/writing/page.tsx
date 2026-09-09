@@ -5,10 +5,11 @@ import { Card, CardMedia, CardContent, Typography, CardActionArea, Box } from '@
 import Link from 'next/link';
 import { client } from '../sanity-client';
 import imageUrlBuilder from '@sanity/image-url';
+import type { SanityImageSource } from '@sanity/image-url';
 
 const builder = imageUrlBuilder(client);
 
-function urlFor(source: any) {
+function urlFor(source: SanityImageSource) {
   return builder.image(source);
 }
 
@@ -25,7 +26,7 @@ interface Post {
       current: string;
     };
   }[];
-  mainImage: any;
+  mainImage: SanityImageSource;
 }
 
 async function getPosts() {

@@ -5,11 +5,11 @@ import { Box, Typography, Card, CardActionArea, CardContent, CardMedia } from "@
 import { client } from "../../../sanity-client";
 import Link from "next/link";
 import imageUrlBuilder from "@sanity/image-url";
-import { PortableText } from "@portabletext/react";
+import type { SanityImageSource } from "@sanity/image-url";
 
 const builder = imageUrlBuilder(client);
 
-function urlFor(source: any) {
+function urlFor(source: SanityImageSource) {
   return builder.image(source);
 }
 
@@ -19,12 +19,12 @@ interface Post {
   slug: {
     current: string;
   };
-  mainImage: any;
+  mainImage: SanityImageSource;
 }
 
 interface Category {
   title: string;
-  description: any;
+  description: string;
 }
 
 async function getCategory(slug: string) {
