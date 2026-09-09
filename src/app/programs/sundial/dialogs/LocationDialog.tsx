@@ -53,7 +53,7 @@ export default function LocationDialog({ open, coords, timezone, onSet, onClose 
 
   const allTimezones = useMemo(() => {
     try {
-      return (Intl as any).supportedValuesOf('timeZone').map((tz: string) => ({
+      return Intl.supportedValuesOf('timeZone').map((tz) => ({
         tz, label: `${getStandardUtcOffset(tz)}  ${tz}`,
       }));
     } catch { return []; }
@@ -84,11 +84,15 @@ export default function LocationDialog({ open, coords, timezone, onSet, onClose 
             inputProps={{ min: -180, max: 180, step: 0.0001 }} fullWidth />
         </Box>
         <Autocomplete
-          value={allTimezones.find((o: { tz: string }) => o.tz === modalTimezone)
-            ?? (modalTimezone ? { tz: modalTimezone, label: `${getStandardUtcOffset(modalTimezone)}  ${modalTimezone}` } : null)}
-          onChange={(_, v: { tz: string; label: string } | null) => { if (v) setModalTimezone(v.tz); }}
+          // disableClearable makes the value non-nullable, so an unset timezone
+          // gets a blank option rather than null.
+          value={allTimezones.find((o) => o.tz === modalTimezone) ?? {
+            tz: modalTimezone,
+            label: modalTimezone ? `${getStandardUtcOffset(modalTimezone)}  ${modalTimezone}` : '',
+          }}
+          onChange={(_, v) => { if (v) setModalTimezone(v.tz); }}
           options={allTimezones}
-          getOptionLabel={(o: { tz: string; label: string }) => o.label}
+          getOptionLabel={(o) => o.label}
           renderInput={params => <TextField {...params} label="Timezone" size="small" />}
           fullWidth
           disableClearable

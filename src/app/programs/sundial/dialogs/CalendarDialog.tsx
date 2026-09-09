@@ -17,9 +17,14 @@ interface FormatActionBarProps extends PickersActionBarProps {
   onUseDMYChange: (value: boolean) => void;
 }
 
-function FormatActionBar({
-  use24h, useDMY, onUse24hChange, onUseDMYChange, className, ...actionBarProps
-}: FormatActionBarProps) {
+// MUI types a slot as accepting only the slot's own props, with no knowledge of
+// the extras slotProps passes alongside them — so the component has to declare
+// the base props and widen internally.
+function FormatActionBar(props: PickersActionBarProps) {
+  const {
+    use24h, useDMY, onUse24hChange, onUseDMYChange, className, ...actionBarProps
+  } = props as FormatActionBarProps;
+
   return (
     <Box className={className} sx={{ display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ display: 'flex', gap: 1.5, px: 2, pb: 1.5 }}>

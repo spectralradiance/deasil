@@ -9,6 +9,7 @@ import Paper from '@mui/material/Paper';
 import Grid from '@mui/material/Grid';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
 import Table from '@mui/material/Table';
@@ -276,27 +277,31 @@ const Page = () => {
       )}
 
       <Grid container spacing={2} sx={{ marginTop: '2rem' }}>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Paper elevation={3} sx={{ padding: '1rem', height: '400px', overflowY: 'auto' }}>
             <Typography variant="h5" component="h2">Symbols</Typography>
             <List>
               <Typography variant="h6">Runes</Typography>
               {Object.values(runes).map((rune) => (
-                <ListItem button key={rune.name} onClick={() => handleSelectSymbol(rune)} sx={{ cursor: 'pointer' }}>
-                  <ListItemText primary={`${rune.glyph} - ${rune.name}`} />
+                <ListItem key={rune.name} disablePadding>
+                  <ListItemButton onClick={() => handleSelectSymbol(rune)}>
+                    <ListItemText primary={`${rune.glyph} - ${rune.name}`} />
+                  </ListItemButton>
                 </ListItem>
               ))}
               <Divider sx={{ marginY: '1rem' }} />
               <Typography variant="h6">Ogham</Typography>
               {Object.values(ogham).map((ogham) => (
-                <ListItem button key={ogham.name} onClick={() => handleSelectSymbol(ogham)} sx={{ cursor: 'pointer' }}>
-                  <ListItemText primary={`${ogham.glyph} - ${ogham.name}`} />
+                <ListItem key={ogham.name} disablePadding>
+                  <ListItemButton onClick={() => handleSelectSymbol(ogham)}>
+                    <ListItemText primary={`${ogham.glyph} - ${ogham.name}`} />
+                  </ListItemButton>
                 </ListItem>
               ))}
             </List>
           </Paper>
         </Grid>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Paper elevation={3} sx={{ padding: '1rem', height: '400px', overflowY: 'auto' }}>
             {selectedSymbol ? (
               <Box>
