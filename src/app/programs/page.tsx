@@ -1,10 +1,12 @@
 "use client";
 import Link from 'next/link';
 import AltarIcon from './AltarIcon';
+import AriaIcon from './AriaIcon';
 import SundialIcon from './SundialIcon';
 
 const programs = [
   { href: '/programs/altar', title: 'Altar', description: 'Tarot, runes, and ogham divination', icon: <AltarIcon /> },
+  { href: '/programs/aria', title: 'Aria', description: 'A generative music tracker', icon: <AriaIcon /> },
   { href: '/programs/sundial', title: 'Sundial', description: 'Solar, lunar, and yearly clocks', icon: <SundialIcon /> },
 ];
 
