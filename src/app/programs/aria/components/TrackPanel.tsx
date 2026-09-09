@@ -4,7 +4,6 @@
 import React from 'react';
 import { Box, Button, IconButton, Stack, TextField, Tooltip } from '@mui/material';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import CasinoIcon from '@mui/icons-material/Casino';
 import ClearIcon from '@mui/icons-material/Clear';
 import RotateLeftIcon from '@mui/icons-material/RotateLeft';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
@@ -15,7 +14,6 @@ interface Props {
   song: Song;
   track: Track;
   onPatch: (patch: Partial<Track>) => void;
-  onFill: () => void;
   onClear: () => void;
   onRotate: (by: number) => void;
   onTranspose: (by: number) => void;
@@ -24,7 +22,7 @@ interface Props {
 }
 
 export default function TrackPanel({
-  song, track, onPatch, onFill, onClear, onRotate, onTranspose, onRemove, canRemove,
+  song, track, onPatch, onClear, onRotate, onTranspose, onRemove, canRemove,
 }: Props) {
   const instrumentIds = Object.keys(song.instruments);
 
@@ -81,9 +79,6 @@ export default function TrackPanel({
       <Row>
         <Field label="edit">
           <Stack direction="row" spacing={1} alignItems="center">
-            <Button size="small" variant="outlined" startIcon={<CasinoIcon />} onClick={onFill}>
-              fill
-            </Button>
             <Button size="small" variant="outlined" startIcon={<ClearIcon />} onClick={onClear}>
               clear
             </Button>

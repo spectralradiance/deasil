@@ -1,8 +1,11 @@
 import type { InstrumentParams } from '../audio/InstrumentParams';
 import { DEFAULT_INSTRUMENT, PRESETS } from '../audio/InstrumentParams';
-import type { ScaleName } from './scale';
+import { SCALE_PATTERNS, type ScaleName } from './scale';
 import { mod } from './math';
-import { generateArpeggio, generatePhrase } from './generate';
+import {
+  generateArpeggio, generatePhrase, generateTrackPhrase, randomSeed,
+  type PitchKind, type RhythmKind,
+} from './generate';
 
 /**
  * The song model.
@@ -25,11 +28,49 @@ export interface Step {
 /** A step slot is either a note or empty. */
 export type StepSlot = Step | null;
 
+/**
+ * Per-track generation settings.
+ *
+ * `live` is the whole point of the phase: while it is on, the track's steps are
+ * re-derived from these settings, so a slider is a musical control you can move
+ * against the loop. Turning it off ("keep") leaves the notes exactly as they
+ * were, now as ordinary editable data. Typing into a live track keeps it too —
+ * an edit you would otherwise lose on the next re-roll.
+ */
+export interface TrackGenerator {
+  pitch: PitchKind;
+  rhythm: RhythmKind;
+  low: number;
+  high: number;
+  stepwise: number;
+  /** Onsets, for the euclidean rhythm. */
+  pulses: number;
+  rotation: number;
+  /** Onset chance, for the random rhythm. */
+  density: number;
+  seed: number;
+  live: boolean;
+}
+
+export const DEFAULT_GENERATOR: TrackGenerator = {
+  pitch: 'walk',
+  rhythm: 'euclidean',
+  low: -2,
+  high: 7,
+  stepwise: 0.7,
+  pulses: 7,
+  rotation: 0,
+  density: 0.6,
+  seed: 1,
+  live: false,
+};
+
 export interface Track {
   id: string;
   name: string;
   instrumentId: string;
   steps: StepSlot[];
+  generator: TrackGenerator;
   /** Note length as a multiple of the step length; above 1, notes overlap. */
   gate: number;
   /** Track level, 0-1. */
@@ -76,6 +117,7 @@ export function createTrack(
     name,
     instrumentId,
     steps: emptySteps(stepCount),
+    generator: { ...DEFAULT_GENERATOR },
     gate: 0.9,
     level: 0.8,
     mute: false,
@@ -139,6 +181,63 @@ export function createSong(): Song {
   };
 }
 
+/** Degrees per octave for the song's mode, needed by the arpeggio generator. */
+export function scaleSizeOf(song: Song): number {
+  return SCALE_PATTERNS[song.scaleName]?.length ?? 7;
+}
+
+// ---- generation ------------------------------------------------------------
+
+/** Re-derives one track's steps from its generator settings. */
+export function regenerateTrack(song: Song, trackId: string): Song {
+  const track = song.tracks.find((t) => t.id === trackId);
+  if (!track) return song;
+  const phrase = generateTrackPhrase(track.generator, song.stepCount, scaleSizeOf(song));
+  return updateTrack(song, trackId, { steps: toSteps(phrase, song.stepCount) });
+}
+
+/**
+ * Re-derives every live track. Called whenever something they depend on
+ * changes — the loop length or the mode — so a live track always reflects its
+ * settings rather than drifting out of sync with the song around it.
+ */
+export function regenerateLiveTracks(song: Song): Song {
+  const size = scaleSizeOf(song);
+  return {
+    ...song,
+    tracks: song.tracks.map((track) =>
+      track.generator.live
+        ? {
+            ...track,
+            steps: toSteps(generateTrackPhrase(track.generator, song.stepCount, size), song.stepCount),
+          }
+        : track),
+  };
+}
+
+/** Updates a track's generator and re-derives it when live. */
+export function setGenerator(song: Song, trackId: string, patch: Partial<TrackGenerator>): Song {
+  const track = song.tracks.find((t) => t.id === trackId);
+  if (!track) return song;
+  const next = updateTrack(song, trackId, { generator: { ...track.generator, ...patch } });
+  return next.tracks.find((t) => t.id === trackId)?.generator.live
+    ? regenerateTrack(next, trackId)
+    : next;
+}
+
+/** New seed, and a fresh roll if the track is live. */
+export function reseedTrack(song: Song, trackId: string): Song {
+  return setGenerator(song, trackId, { seed: randomSeed() });
+}
+
+/**
+ * Turns generation off, keeping the notes it produced. The steps are already
+ * real data, so this only clears the flag — nothing is rewritten.
+ */
+export function keepTrack(song: Song, trackId: string): Song {
+  return setGenerator(song, trackId, { live: false });
+}
+
 // ---- pure updates ----------------------------------------------------------
 
 export function setStep(song: Song, trackId: string, index: number, step: StepSlot): Song {
@@ -172,7 +271,7 @@ export function clearTrack(song: Song, trackId: string): Song {
 export function setStepCount(song: Song, stepCount: number): Song {
   const count = Math.max(MIN_STEPS, Math.min(MAX_STEPS, Math.round(stepCount)));
   if (count === song.stepCount) return song;
-  return {
+  const resized: Song = {
     ...song,
     stepCount: count,
     tracks: song.tracks.map((track) => ({
@@ -180,6 +279,8 @@ export function setStepCount(song: Song, stepCount: number): Song {
       steps: Array.from({ length: count }, (_, i) => track.steps[i] ?? null),
     })),
   };
+  // Live tracks fill the new length rather than trailing rests behind them.
+  return regenerateLiveTracks(resized);
 }
 
 export function addTrack(song: Song): Song {

@@ -61,13 +61,25 @@ export default function TrackHeaders({
               gap: 0.25,
             }}
           >
-            <Typography
-              noWrap
-              sx={{ fontSize: 12, fontFamily: 'inherit', maxWidth: '100%' }}
-              title={track.name}
-            >
-              {track.name}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, maxWidth: '100%' }}>
+              {track.generator.live && (
+                <Tooltip title="Generating live: this track re-rolls from its generator settings">
+                  <Box
+                    sx={{
+                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                      backgroundColor: 'primary.main',
+                    }}
+                  />
+                </Tooltip>
+              )}
+              <Typography
+                noWrap
+                sx={{ fontSize: 12, fontFamily: 'inherit' }}
+                title={track.name}
+              >
+                {track.name}
+              </Typography>
+            </Box>
             <Box sx={{ display: 'flex', gap: 0.25 }}>
               <Tooltip title="Mute">
                 <Box

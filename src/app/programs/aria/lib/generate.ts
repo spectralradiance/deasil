@@ -133,3 +133,117 @@ export function repeatTo(phrase: Phrase, length: number): Phrase {
 export function transpose(phrase: Phrase, by: number): Phrase {
   return phrase.map((d) => (d === null ? null : d + by));
 }
+
+// ---- rhythm ----------------------------------------------------------------
+
+export type RhythmKind = 'every' | 'euclidean' | 'random';
+
+/**
+ * Euclidean rhythm: spreads `pulses` onsets as evenly as possible over `steps`.
+ *
+ * This is the Bresenham line-drawing formulation, which produces the same
+ * necklaces as Bjorklund's algorithm for every input we care about, in a
+ * fraction of the code. (3, 8) gives the tresillo, (5, 8) the cinquillo,
+ * (7, 16) a clave — the patterns that turn up in most of the world's music, out
+ * of one integer.
+ */
+export function euclideanRhythm(pulses: number, steps: number, rotation = 0): boolean[] {
+  const n = Math.max(0, Math.floor(steps));
+  const k = Math.max(0, Math.min(n, Math.floor(pulses)));
+  if (n === 0) return [];
+  if (k === 0) return new Array<boolean>(n).fill(false);
+
+  const raw: boolean[] = [];
+  // Seeded at n - k so the accumulator crosses on the very first step: the
+  // pattern then begins on an onset, which is what a downbeat wants. (3, 8)
+  // comes out as the tresillo x..x..x. rather than a rotation of it.
+  let bucket = n - k;
+  for (let i = 0; i < n; ++i) {
+    bucket += k;
+    if (bucket >= n) {
+      bucket -= n;
+      raw.push(true);
+    } else {
+      raw.push(false);
+    }
+  }
+  // Rotate so the pattern can start somewhere other than its first onset.
+  return Array.from({ length: n }, (_, i) => raw[mod(i - rotation, n)]);
+}
+
+export interface RhythmOptions {
+  length: number;
+  kind: RhythmKind;
+  /** Onsets, for the euclidean kind. */
+  pulses?: number;
+  /** Steps to rotate the euclidean pattern by. */
+  rotation?: number;
+  /** Chance of an onset, for the random kind, 0-1. */
+  density?: number;
+  seed?: number;
+}
+
+/** A mask of which steps carry a note. */
+export function generateRhythm(options: RhythmOptions): boolean[] {
+  const { length, kind, pulses = 4, rotation = 0, density = 0.6, seed = 0 } = options;
+  if (kind === 'every') return new Array<boolean>(length).fill(true);
+  if (kind === 'euclidean') return euclideanRhythm(pulses, length, rotation);
+  // Offset the seed so a track's rhythm and its pitches do not move in lockstep
+  // when the seed changes.
+  const rng = createRng(seed ^ 0x9e3779b9);
+  return Array.from({ length }, () => rng() < density);
+}
+
+// ---- composed track generation ---------------------------------------------
+
+export type PitchKind = 'walk' | 'arpeggio' | 'drone';
+
+export interface TrackGeneratorOptions {
+  pitch: PitchKind;
+  rhythm: RhythmKind;
+  low: number;
+  high: number;
+  stepwise: number;
+  pulses: number;
+  rotation: number;
+  density: number;
+  seed: number;
+}
+
+/**
+ * Rhythm and pitch are generated separately and then combined: the mask decides
+ * *when* a note happens, the pitch generator decides *what* it is. Keeping them
+ * apart means changing the rhythm does not re-roll the melody, and changing the
+ * melody does not disturb the groove.
+ */
+export function generateTrackPhrase(
+  options: TrackGeneratorOptions,
+  length: number,
+  scaleSize: number,
+): Phrase {
+  const mask = generateRhythm({
+    length,
+    kind: options.rhythm,
+    pulses: options.pulses,
+    rotation: options.rotation,
+    density: options.density,
+    seed: options.seed,
+  });
+
+  let pitches: Phrase;
+  if (options.pitch === 'arpeggio') {
+    pitches = generateArpeggio(options.low, length, [0, 2, 4], 2, scaleSize);
+  } else if (options.pitch === 'drone') {
+    pitches = new Array<number | null>(length).fill(options.low);
+  } else {
+    pitches = generatePhrase({
+      length,
+      low: options.low,
+      high: options.high,
+      stepwise: options.stepwise,
+      seed: options.seed,
+    });
+  }
+
+  return Array.from({ length }, (_, i) => (mask[i] ? pitches[i] ?? null : null));
+}

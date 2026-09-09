@@ -1,4 +1,8 @@
-import { createSong, MAX_STEPS, MIN_STEPS, type Song, type StepSlot, type Track } from './song';
+import {
+  createSong, DEFAULT_GENERATOR, MAX_STEPS, MIN_STEPS,
+  type Song, type StepSlot, type Track, type TrackGenerator,
+} from './song';
+import type { PitchKind, RhythmKind } from './generate';
 import { SCALE_PATTERNS, type ScaleName } from './scale';
 import { DEFAULT_INSTRUMENT, type InstrumentParams } from '../audio/InstrumentParams';
 
@@ -79,6 +83,31 @@ function parseInstrument(value: unknown): InstrumentParams {
   };
 }
 
+const PITCH_KINDS: PitchKind[] = ['walk', 'arpeggio', 'drone'];
+const RHYTHM_KINDS: RhythmKind[] = ['every', 'euclidean', 'random'];
+
+function parseGenerator(value: unknown, stepCount: number): TrackGenerator {
+  if (!isRecord(value)) return { ...DEFAULT_GENERATOR };
+  const pitch = PITCH_KINDS.includes(value.pitch as PitchKind)
+    ? (value.pitch as PitchKind)
+    : DEFAULT_GENERATOR.pitch;
+  const rhythm = RHYTHM_KINDS.includes(value.rhythm as RhythmKind)
+    ? (value.rhythm as RhythmKind)
+    : DEFAULT_GENERATOR.rhythm;
+  return {
+    pitch,
+    rhythm,
+    low: Math.round(num(value.low, DEFAULT_GENERATOR.low, -28, 28)),
+    high: Math.round(num(value.high, DEFAULT_GENERATOR.high, -28, 28)),
+    stepwise: num(value.stepwise, DEFAULT_GENERATOR.stepwise, 0, 1),
+    pulses: Math.round(num(value.pulses, DEFAULT_GENERATOR.pulses, 0, stepCount)),
+    rotation: Math.round(num(value.rotation, 0, -MAX_STEPS, MAX_STEPS)),
+    density: num(value.density, DEFAULT_GENERATOR.density, 0, 1),
+    seed: Math.round(num(value.seed, DEFAULT_GENERATOR.seed, 0, 0xffffffff)),
+    live: bool(value.live, false),
+  };
+}
+
 function parseTrack(value: unknown, stepCount: number, fallbackInstrument: string): Track | null {
   if (!isRecord(value)) return null;
   const rawSteps = Array.isArray(value.steps) ? value.steps : [];
@@ -87,6 +116,7 @@ function parseTrack(value: unknown, stepCount: number, fallbackInstrument: strin
     name: str(value.name, 'track'),
     instrumentId: str(value.instrumentId, fallbackInstrument),
     steps: Array.from({ length: stepCount }, (_, i) => parseStep(rawSteps[i])),
+    generator: parseGenerator(value.generator, stepCount),
     gate: num(value.gate, 0.9, 0.05, 8),
     level: num(value.level, 0.8, 0, 1),
     mute: bool(value.mute, false),

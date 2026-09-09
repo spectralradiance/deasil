@@ -1,38 +1,28 @@
-// Aria — a generative music tracker. Phase 3: a multi-track pattern grid.
+// Aria — a generative music tracker. Phase 4: per-track generation.
 // The audio engine lives in audio/ and never touches React; this page only
 // reads and writes the song, and pushes it into the session.
 
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Divider, Paper, Stack, Typography } from '@mui/material';
+import { Box, Chip, Paper, Stack, Typography } from '@mui/material';
 import { AriaSession } from './audio/AriaSession';
 import { DEFAULT_INSTRUMENT } from './audio/InstrumentParams';
 import { Scale, type ScaleName } from './lib/scale';
-import { generateArpeggio, generatePhrase, randomSeed } from './lib/generate';
 import {
-  addTrack, clearTrack, createSong, fillTrack, removeTrack, rotateTrack,
-  setStep as setSongStep, setStepCount, transposeTrack, updateTrack, type Song,
-  type StepSlot,
+  addTrack, clearTrack, createSong, keepTrack, regenerateLiveTracks, regenerateTrack,
+  removeTrack, reseedTrack, rotateTrack, setGenerator, setStep as setSongStep,
+  setStepCount, transposeTrack, updateTrack,
+  type Song, type StepSlot, type TrackGenerator,
 } from './lib/song';
 import { loadSong, saveSong } from './lib/serialize';
 import TransportBar from './components/TransportBar';
 import TrackHeaders from './components/TrackHeaders';
 import TrackPanel from './components/TrackPanel';
+import TrackGeneratorPanel from './components/TrackGeneratorPanel';
 import PatternGrid, { type Cursor } from './components/PatternGrid';
-import GeneratorPanel, { type GeneratorSettings } from './components/GeneratorPanel';
+import SongPanel from './components/SongPanel';
 import InstrumentPanel from './components/InstrumentPanel';
-
-const INITIAL_GENERATOR: GeneratorSettings = {
-  kind: 'walk',
-  scaleName: 'dorian',
-  root: 'C3',
-  low: -5,
-  high: 7,
-  restDensity: 0.25,
-  stepwise: 0.7,
-  seed: 20260909,
-};
 
 function Section({ title, action, children }: {
   title: string;
@@ -41,7 +31,7 @@ function Section({ title, action, children }: {
 }) {
   return (
     <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 2 }}>
         <Typography variant="overline" sx={{ opacity: 0.6, letterSpacing: '0.12em' }}>
           {title}
         </Typography>
@@ -62,17 +52,13 @@ export default function AriaPage() {
   const [follow, setFollow] = useState(true);
   const [cursor, setCursor] = useState<Cursor>({ track: 0, step: 0 });
   const [octaveOffset, setOctaveOffset] = useState(0);
-  const [gen, setGen] = useState<GeneratorSettings>(INITIAL_GENERATOR);
   const [loaded, setLoaded] = useState(false);
 
   // Restore the autosave after mount: localStorage is not available during the
   // server render, and reading it in an effect keeps hydration consistent.
   useEffect(() => {
     const stored = loadSong();
-    if (stored) {
-      setSong(stored);
-      setGen((current) => ({ ...current, root: stored.key, scaleName: stored.scaleName }));
-    }
+    if (stored) setSong(stored);
     setLoaded(true);
   }, []);
 
@@ -91,11 +77,11 @@ export default function AriaPage() {
 
   // A bad key should not throw mid-render or silence the loop, so fall back to
   // the last good scale and let the field show the error.
-  const { scale, rootError } = useMemo(() => {
+  const { scale, keyError } = useMemo(() => {
     try {
-      return { scale: new Scale(song.key, song.scaleName), rootError: false };
+      return { scale: new Scale(song.key, song.scaleName), keyError: false };
     } catch {
-      return { scale: new Scale('C3', song.scaleName), rootError: true };
+      return { scale: new Scale('C3', song.scaleName), keyError: true };
     }
   }, [song.key, song.scaleName]);
 
@@ -103,7 +89,8 @@ export default function AriaPage() {
   // Audio when transport values or the track set actually change.
   useEffect(() => { session.setSong(song, scale); }, [session, song, scale]);
 
-  const selectedTrack = song.tracks[Math.min(cursor.track, song.tracks.length - 1)];
+  const selectedIndex = Math.min(cursor.track, song.tracks.length - 1);
+  const selectedTrack = song.tracks[selectedIndex];
 
   const handlePlay = useCallback(async () => {
     await session.start();
@@ -122,61 +109,33 @@ export default function AriaPage() {
 
   const readStep = useCallback(() => session.getPlayingStep(), [session]);
 
+  /**
+   * Hand-editing a live track keeps it first. Without that the edit would
+   * survive only until the next re-roll, which is a confusing way to lose work.
+   */
   const handleSetStep = useCallback((trackIndex: number, stepIndex: number, step: StepSlot) => {
     setSong((current) => {
       const track = current.tracks[trackIndex];
-      return track ? setSongStep(current, track.id, stepIndex, step) : current;
+      if (!track) return current;
+      const base = track.generator.live ? keepTrack(current, track.id) : current;
+      return setSongStep(base, track.id, stepIndex, step);
     });
   }, []);
 
-  const buildPhrase = useCallback(() => {
-    if (gen.kind === 'arpeggio') {
-      return generateArpeggio(0, song.stepCount, [0, 2, 4], 2, scale.size);
-    }
-    return generatePhrase({
-      length: song.stepCount,
-      low: gen.low,
-      high: gen.high,
-      restDensity: gen.restDensity,
-      stepwise: gen.stepwise,
-      seed: gen.seed,
-    });
-  }, [gen, song.stepCount, scale.size]);
-
-  const fillSelected = useCallback(() => {
+  const patchGenerator = useCallback((patch: Partial<TrackGenerator>) => {
     if (!selectedTrack) return;
-    setSong((current) => fillTrack(current, selectedTrack.id, buildPhrase()));
-  }, [selectedTrack, buildPhrase]);
+    setSong((current) => setGenerator(current, selectedTrack.id, patch));
+  }, [selectedTrack]);
 
-  const reseedAndFill = useCallback(() => {
-    const seed = randomSeed();
-    setGen((current) => ({ ...current, seed }));
-    if (!selectedTrack) return;
-    const phrase = gen.kind === 'arpeggio'
-      ? generateArpeggio(0, song.stepCount, [0, 2, 4], 2, scale.size)
-      : generatePhrase({
-          length: song.stepCount,
-          low: gen.low,
-          high: gen.high,
-          restDensity: gen.restDensity,
-          stepwise: gen.stepwise,
-          seed,
-        });
-    setSong((current) => fillTrack(current, selectedTrack.id, phrase));
-  }, [gen, selectedTrack, song.stepCount, scale.size]);
-
-  // Key and mode belong to the song, so the generator panel edits it directly.
-  const handleGenerator = useCallback((next: GeneratorSettings) => {
-    setGen(next);
-    setSong((current) =>
-      current.key === next.root && current.scaleName === next.scaleName
-        ? current
-        : { ...current, key: next.root, scaleName: next.scaleName as ScaleName },
-    );
+  const handleScale = useCallback((scaleName: ScaleName) => {
+    // Live tracks re-derive: an arpeggio in a pentatonic scale is not the same
+    // set of degrees as one in a heptatonic scale.
+    setSong((current) => regenerateLiveTracks({ ...current, scaleName }));
   }, []);
 
   const instrumentId = selectedTrack?.instrumentId ?? '';
   const instrumentParams = song.instruments[instrumentId] ?? DEFAULT_INSTRUMENT;
+  const liveCount = song.tracks.filter((t) => t.generator.live).length;
 
   return (
     <Box sx={{ maxWidth: 980, mx: 'auto', px: { xs: 2, sm: 3 }, py: 4 }}>
@@ -203,6 +162,16 @@ export default function AriaPage() {
           />
         </Section>
 
+        <Section title="Song">
+          <SongPanel
+            songKey={song.key}
+            scaleName={song.scaleName}
+            onKey={(key) => setSong((c) => ({ ...c, key }))}
+            onScale={handleScale}
+            keyError={keyError}
+          />
+        </Section>
+
         <Section
           title="Pattern"
           action={
@@ -213,7 +182,7 @@ export default function AriaPage() {
         >
           <TrackHeaders
             song={song}
-            selected={cursor.track}
+            selected={selectedIndex}
             onSelect={(track) => setCursor((c) => ({ ...c, track }))}
             onToggleMute={(id) =>
               setSong((c) => updateTrack(c, id, { mute: !c.tracks.find((t) => t.id === id)?.mute }))}
@@ -244,12 +213,37 @@ export default function AriaPage() {
         </Section>
 
         {selectedTrack && (
+          <Section
+            title={`Generator — ${selectedTrack.name}`}
+            action={
+              liveCount > 0 ? (
+                <Chip
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  label={`${liveCount} live track${liveCount === 1 ? '' : 's'}`}
+                />
+              ) : undefined
+            }
+          >
+            <TrackGeneratorPanel
+              generator={selectedTrack.generator}
+              stepCount={song.stepCount}
+              stepsPerBeat={song.stepsPerBeat}
+              onChange={patchGenerator}
+              onReseed={() => setSong((c) => reseedTrack(c, selectedTrack.id))}
+              onKeep={() => setSong((c) => keepTrack(c, selectedTrack.id))}
+              onGenerateOnce={() => setSong((c) => regenerateTrack(c, selectedTrack.id))}
+            />
+          </Section>
+        )}
+
+        {selectedTrack && (
           <Section title={`Track — ${selectedTrack.name}`}>
             <TrackPanel
               song={song}
               track={selectedTrack}
               onPatch={(patch) => setSong((c) => updateTrack(c, selectedTrack.id, patch))}
-              onFill={fillSelected}
               onClear={() => setSong((c) => clearTrack(c, selectedTrack.id))}
               onRotate={(by) => setSong((c) => rotateTrack(c, selectedTrack.id, by))}
               onTranspose={(by) => setSong((c) => transposeTrack(c, selectedTrack.id, by))}
@@ -258,23 +252,6 @@ export default function AriaPage() {
             />
           </Section>
         )}
-
-        <Section title="Generator">
-          <Stack spacing={2.5}>
-            <GeneratorPanel
-              settings={gen}
-              onChange={handleGenerator}
-              onReseed={reseedAndFill}
-              rootError={rootError}
-            />
-            <Divider />
-            <Typography variant="caption" sx={{ opacity: 0.6 }}>
-              Key and mode belong to the song: every track re-voices at once,
-              because steps store degrees rather than pitches. <strong>Reseed</strong>{' '}
-              rolls a new phrase into the selected track.
-            </Typography>
-          </Stack>
-        </Section>
 
         <Section title={`Instrument — ${instrumentId}`}>
           <InstrumentPanel
@@ -286,10 +263,10 @@ export default function AriaPage() {
       </Stack>
 
       <Typography variant="caption" sx={{ display: 'block', opacity: 0.5, mt: 3 }}>
-        Phase 3 of{' '}
+        Phase 4 of{' '}
         <Box component="span" sx={{ fontStyle: 'italic' }}>docs/aria-plan.md</Box>
-        {' '}— next comes the generator panel per track, then the node-graph
-        instrument editor. The song autosaves to this browser.
+        {' '}— next comes the node-graph instrument editor. The song autosaves to
+        this browser.
       </Typography>
     </Box>
   );

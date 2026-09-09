@@ -52,6 +52,7 @@ function degreeForKey(key: string, scaleSize: number): number | null {
 interface RowProps {
   rowIndex: number;
   slots: StepSlot[];
+  scale: Scale;
   cursorTrack: number;
   isCursorRow: boolean;
   beat: boolean;
@@ -64,6 +65,9 @@ function rowsEqual(a: RowProps, b: RowProps): boolean {
     a.isCursorRow !== b.isCursorRow ||
     a.beat !== b.beat ||
     a.bar !== b.bar ||
+    // The cells name the pitch each degree resolves to, so a change of key or
+    // mode has to invalidate every row or the tooltips go stale.
+    a.scale !== b.scale ||
     a.slots.length !== b.slots.length
   ) {
     return false;
@@ -76,7 +80,7 @@ function rowsEqual(a: RowProps, b: RowProps): boolean {
 }
 
 const PatternRow = React.memo(function PatternRow({
-  rowIndex, slots, cursorTrack, isCursorRow, beat, bar,
+  rowIndex, slots, scale, cursorTrack, isCursorRow, beat, bar,
 }: RowProps) {
   return (
     <Box
@@ -110,6 +114,7 @@ const PatternRow = React.memo(function PatternRow({
           className="aria-cell"
           data-track={trackIndex}
           data-step={rowIndex}
+          title={slot ? `degree ${slot.degree} — ${scale.noteAt(slot.degree).shortName}` : ''}
           sx={{
             flex: '1 1 0',
             minWidth: 56,
@@ -296,6 +301,7 @@ export default function PatternGrid({
             key={i}
             rowIndex={i}
             slots={slots}
+            scale={scale}
             cursorTrack={cursor.track}
             isCursorRow={i === cursor.step}
             beat={i % song.stepsPerBeat === 0}

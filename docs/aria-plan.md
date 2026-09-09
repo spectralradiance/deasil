@@ -309,9 +309,9 @@ its phrase strip rather than introducing a page. `Song` model, pattern grid with
 navigation, transport bar, per-track mute/solo, loop, follow mode, localStorage
 autosave, multi-track playback. *Deliverable: the actual tracker.*
 
-**Phase 4 — Generation.** A `GeneratorPanel` per track: scale, key, degree range,
-note count, rest density, rhythm, seed. Re-roll live without stopping the loop;
-"keep" commits generated notes into the pattern as editable steps.
+**Phase 4 — Generation. ✅ done.** A generator panel per track: pitch kind,
+degree range, rhythm kind, pulses, rotation, density, seed. Re-rolls live
+without stopping the loop; "keep" commits the notes as ordinary editable steps.
 *Deliverable: the Sonic Pi character.*
 
 **Phase 5 — Instrument graph.** Node registry, `InstrumentGraph` compiler, React
@@ -457,12 +457,55 @@ a stepwise lead, an offbeat pluck arpeggio, a sustaining pad.
 Files added: `lib/{song,serialize}.ts`, `components/{PatternGrid,TrackHeaders,TrackPanel}.tsx`;
 `AriaSession` rewritten for one Instrument per track. `PhraseStrip` is gone.
 
-## 11. Next steps
+## 11. Phase 4 results
 
-1. **Phase 4:** move the generator into a per-track panel with its own stored
-   settings and seed, so each track re-rolls independently.
-2. `npm i @xyflow/react` before phase 5.
-3. The harness at `/aria-scratch/` still holds the 66 assertions. Either move
-   them to a real test runner or retire it once phase 4 lands.
-4. Not yet built from the phase-3 list: the order list / song arrangement, which
-   the plan puts in phase 6 alongside JSON import/export.
+Every track carries its own generator, and while `live` is on its steps are
+re-derived from those settings — so a slider is a musical control you move
+against the running loop rather than a form you fill in and submit.
+
+**Rhythm and pitch are generated separately, then combined.** The rhythm decides
+*when* a note happens, the pitch generator decides *what* it is. Verified: with
+a live track, moving pulses from 7 to 4 changed the onsets to 0, 4, 8, 12 while
+the pitches sitting at those positions stayed exactly as they were. Reseeding
+does the converse — new pitches, same euclidean groove. Changing the groove
+never re-rolls the melody, and vice versa.
+
+**Euclidean rhythm** is the Bresenham formulation, which yields the same
+necklaces as Bjorklund in a fraction of the code: 3 of 8 is the tresillo, 4 of
+16 is four to the floor, 7 of 16 a clave. The accumulator is seeded at `n - k`
+so the pattern begins *on* an onset — the naive version starts on a rest, which
+is a strange default for a downbeat. A read-only dot preview sits under the
+controls, and it was checked against the actual track mask rather than assumed:
+both `1000100010001000`.
+
+**What "live" means at the edges**, all verified in the browser:
+
+- **keep** clears the flag and leaves the notes byte-identical — they were
+  already real data, so nothing is rewritten.
+- **typing into a live track keeps it first.** Otherwise the edit would survive
+  only until the next re-roll, which is a confusing way to lose work.
+- **changing the mode re-derives live tracks**, but only actually moves the ones
+  whose output depends on scale size. An arpeggio's degree at step 4 went 7 → 5
+  switching from dorian to minor pentatonic, because the octave stride follows
+  the scale. A walk's degrees are scale-independent and correctly did not move —
+  only the pitches they resolve to did.
+- **editing a generator mid-playback never interrupts the transport.**
+
+**Grid cells now name their pitch.** A degree-based tracker is hard to read
+without it, and it is what makes a mode change legible: same degrees 5, 1, 3
+resolve to A3/D3/F3 in C major, G#3/C#3/F3 in phrygian, A#3/D3/F#3 in whole
+tone. The scale is part of the row memo comparator, so the tooltips cannot go
+stale when the key or mode changes.
+
+Files added: `components/{TrackGeneratorPanel,SongPanel}.tsx`, rhythm and
+composed generation in `lib/generate.ts`, `TrackGenerator` in `lib/song.ts`.
+The old song-level `GeneratorPanel` is gone.
+
+## 12. Next steps
+
+1. **Phase 5:** the node-graph instrument editor — `npm i @xyflow/react` first.
+2. The harness at `/aria-scratch/` still holds the 66 assertions and no longer
+   covers the newer lib code. Move them to a real test runner rather than
+   growing it further.
+3. Still unbuilt: the order list / song arrangement, and JSON import/export,
+   both of which the plan puts in phase 6.
