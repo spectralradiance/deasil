@@ -40,6 +40,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# aria phase-1 scratch harness build output (source lives in src/app/programs/aria/__scratch__)
+/public/aria-scratch/bundle.js
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

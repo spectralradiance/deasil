@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Aria — phase 1 scratch harness</title>
+<style>
+  :root { color-scheme: light dark; --line: #8883; }
+  body {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    margin: 0; padding: 2rem; line-height: 1.5; max-width: 860px;
+  }
+  h1 { font-size: 1.2rem; margin: 0 0 .25rem; letter-spacing: .04em; }
+  .sub { opacity: .6; font-size: .8rem; margin-bottom: 2rem; }
+  section { border-top: 1px solid var(--line); padding: 1.25rem 0; }
+  h2 { font-size: .75rem; text-transform: uppercase; letter-spacing: .12em; opacity: .6; margin: 0 0 1rem; }
+  .row { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-end; }
+  label { display: block; font-size: .7rem; opacity: .6; margin-bottom: .35rem; letter-spacing: .06em; }
+  input[type=range] { width: 180px; }
+  input[type=text] { width: 70px; padding: .3rem; font: inherit; }
+  select { padding: .3rem; font: inherit; }
+  button {
+    font: inherit; padding: .45rem 1.1rem; border: 1px solid currentColor;
+    background: none; color: inherit; cursor: pointer; border-radius: 2px;
+  }
+  button[disabled] { opacity: .3; cursor: default; }
+  .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; }
+  .readout .v { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+  .readout .k { font-size: .68rem; opacity: .55; letter-spacing: .08em; text-transform: uppercase; }
+  #checks { font-size: .78rem; columns: 2; column-gap: 2rem; }
+  #checks div { break-inside: avoid; }
+  .ok { color: #2e7d32; }
+  .bad { color: #c62828; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { .ok { color: #81c784; } .bad { color: #ef9a9a; } }
+  code { background: #8881; padding: .1em .35em; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<h1>Aria — phase 1 scratch harness</h1>
+<div class="sub">engine skeleton: worker clock, lookahead scheduler, ported Note / Scale / tuning. not a route.</div>
+
+<section>
+  <h2>Transport</h2>
+  <div class="row">
+    <div>
+      <label for="bpm">bpm <span id="bpm-value">120</span></label>
+      <input id="bpm" type="range" min="40" max="240" step="1" value="120" />
+    </div>
+    <div>
+      <label for="steps">loop steps <span id="steps-value">16</span></label>
+      <input id="steps" type="range" min="4" max="64" step="4" value="16" />
+    </div>
+    <div>
+      <label for="mode">mode</label>
+      <select id="mode">
+        <option value="metronome">metronome</option>
+        <option value="scale">scale run</option>
+      </select>
+    </div>
+    <div>
+      <label for="scale">scale</label>
+      <select id="scale"></select>
+    </div>
+    <div>
+      <label for="root">root</label>
+      <input id="root" type="text" value="C3" />
+    </div>
+    <div>
+      <button id="play">play</button>
+      <button id="stop" disabled>stop</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Clock health</h2>
+  <div class="readouts">
+    <div class="readout"><div class="v" id="step">--</div><div class="k">playing step</div></div>
+    <div class="readout"><div class="v" id="lead">—</div><div class="k">min schedule lead</div></div>
+    <div class="readout"><div class="v" id="late">0 / 0</div><div class="k">late / scheduled</div></div>
+    <div class="readout"><div class="v" id="ctxtime">0.00</div><div class="k">context time</div></div>
+    <div class="readout"><div class="v" id="clock" style="font-size:1rem">—</div><div class="k">timer source</div></div>
+  </div>
+  <p class="sub" style="margin:1rem 0 0">
+    <strong>min schedule lead</strong> is how close the scheduler ever came to missing its window;
+    it should stay well above zero. <strong>late</strong> must remain 0. Background this tab for a
+    minute, come back, and both should be unchanged — that is the worker clock earning its keep.
+    <button id="reset-stats" style="padding:.2rem .6rem;font-size:.8rem">reset</button>
+  </p>
+</section>
+
+<section>
+  <h2>Ported logic checks — <span id="checks-summary">running…</span></h2>
+  <div id="checks"></div>
+  <p class="sub" style="margin:1rem 0 0">
+    These cover the three prototype bugs: <code>mod()</code> returning <code>b</code> for exact
+    negative multiples, the downward scale walk consuming the wrong step sizes, and
+    <code>harmonic_minor</code> summing to 13 semitones.
+  </p>
+</section>
+
+<script src="./bundle.js"></script>
+</body>
+</html>
