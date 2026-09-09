@@ -1,8 +1,8 @@
-// Play/stop, tempo, loop length, polyphony, and the live voice readout.
+// Play/stop, tempo, loop length, follow mode, and the live voice readout.
 
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Box, Button, Chip, Stack, Tooltip } from '@mui/material';
+import { Box, Button, Chip, FormControlLabel, Stack, Switch, Tooltip } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import { Row, SliderField } from './ControlRow';
@@ -17,29 +17,23 @@ interface Props {
   onBpm: (bpm: number) => void;
   steps: number;
   onSteps: (steps: number) => void;
-  polyphony: number;
-  onPolyphony: (polyphony: number) => void;
+  follow: boolean;
+  onFollow: (follow: boolean) => void;
 }
 
 export default function TransportBar({
-  session, playing, onPlay, onStop,
-  bpm, onBpm, steps, onSteps, polyphony, onPolyphony,
+  session, playing, onPlay, onStop, bpm, onBpm, steps, onSteps, follow, onFollow,
 }: Props) {
-  const [voices, setVoices] = useState(0);
-  const [stolen, setStolen] = useState(0);
+  const [load, setLoad] = useState({ active: 0, capacity: 0, stolen: 0 });
 
-  // Voice count is cheap to read but changes constantly, so poll it a few times
-  // a second rather than every frame — it is a readout, not a playhead.
+  // A readout, not a playhead: a few times a second is plenty, and it keeps the
+  // 60Hz frame budget for the grid.
   useEffect(() => {
     if (!playing) {
-      setVoices(0);
+      setLoad((current) => ({ ...current, active: 0 }));
       return;
     }
-    const id = setInterval(() => {
-      const stats = session.stats();
-      setVoices(stats.activeVoices);
-      setStolen(stats.stolenNotes);
-    }, 150);
+    const id = setInterval(() => setLoad(session.voiceLoad()), 150);
     return () => clearInterval(id);
   }, [playing, session]);
 
@@ -75,24 +69,22 @@ export default function TransportBar({
         format={(v) => `${v} steps`}
         onChange={onSteps}
       />
-      <SliderField
-        label="polyphony"
-        value={polyphony}
-        min={1}
-        max={16}
-        step={1}
-        format={(v) => `${v} voices`}
-        onChange={onPolyphony}
-        width={120}
-      />
+
+      <Tooltip title="Keep the playing row centred. Turn it off to edit somewhere else while the loop runs.">
+        <FormControlLabel
+          sx={{ mb: 0.25 }}
+          control={<Switch size="small" checked={follow} onChange={(e) => onFollow(e.target.checked)} />}
+          label={<Box sx={{ fontSize: 13 }}>follow</Box>}
+        />
+      </Tooltip>
 
       <Stack direction="row" spacing={1} sx={{ pb: 0.5 }}>
-        <Tooltip title="Voices sounding right now, against the polyphony cap">
-          <Chip size="small" variant="outlined" label={`${voices} / ${polyphony} voices`} />
+        <Tooltip title="Voices sounding across every track, against the summed polyphony caps">
+          <Chip size="small" variant="outlined" label={`${load.active} / ${load.capacity || '—'} voices`} />
         </Tooltip>
-        {stolen > 0 && (
-          <Tooltip title="Notes that had to steal a voice because the cap was reached. Raise polyphony, or shorten the gate.">
-            <Chip size="small" variant="outlined" color="warning" label={`${stolen} stolen`} />
+        {load.stolen > 0 && (
+          <Tooltip title="Notes that had to steal a voice. Raise a track's polyphony, or shorten its gate.">
+            <Chip size="small" variant="outlined" color="warning" label={`${load.stolen} stolen`} />
           </Tooltip>
         )}
       </Stack>

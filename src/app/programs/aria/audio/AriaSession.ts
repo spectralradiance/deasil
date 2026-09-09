@@ -1,133 +1,154 @@
 import { AudioEngine } from './AudioEngine';
 import { Scheduler, type StepEvent } from './Scheduler';
 import { Instrument } from './Instrument';
-import { DEFAULT_INSTRUMENT, type InstrumentParams } from './InstrumentParams';
+import { DEFAULT_INSTRUMENT } from './InstrumentParams';
 import { Scale } from '../lib/scale';
+import { isAudible, type Song } from '../lib/song';
 import { mod } from '../lib/math';
-import type { Phrase } from '../lib/generate';
 
 /**
  * Everything the page needs to make sound, with no React in it.
  *
  * The scheduler's step handler runs ahead of the audio clock and must never
- * wait on a render. So the values it reads live here in a mutable block that
- * the UI overwrites, rather than being closed over from a component. Editing
- * the patch or the phrase mid-loop takes effect on the next scheduled step
- * without re-registering anything or interrupting playback.
+ * wait on a render, so it reads the song from a mutable field the UI
+ * overwrites rather than from a closure. Editing a step, a patch, the key or
+ * the mode lands on the next scheduled step without re-registering anything and
+ * without interrupting playback.
+ *
+ * One Instrument per *track*, not per patch. Two tracks sharing a patch id still
+ * need separate voice pools, or a busy track would steal the other's voices.
  */
-
-export interface SessionState {
-  phrase: Phrase;
-  scale: Scale;
-  /** Note length as a multiple of the step length. Above 1, notes overlap. */
-  gate: number;
-  velocity: number;
-  params: InstrumentParams;
-}
-
-const INITIAL_STATE: SessionState = {
-  phrase: [],
-  scale: new Scale('C3', 'dorian'),
-  gate: 0.9,
-  velocity: 0.9,
-  params: DEFAULT_INSTRUMENT,
-};
-
 export class AriaSession {
   readonly engine: AudioEngine;
   readonly scheduler: Scheduler;
-  private instrument: Instrument | null = null;
-  private state: SessionState;
-  private polyphony = 8;
 
-  constructor(initial: Partial<SessionState> = {}) {
+  private song: Song | null = null;
+  private scale = new Scale('C3', 'dorian');
+  private instruments = new Map<string, Instrument>();
+  private started = false;
+
+  constructor() {
     this.engine = new AudioEngine({ masterVolume: 0.7 });
     this.scheduler = new Scheduler(this.engine, { bpm: 110, stepsPerBeat: 4, stepCount: 16 });
-    this.state = { ...INITIAL_STATE, ...initial };
   }
 
   get isPlaying(): boolean {
     return this.scheduler.isPlaying;
   }
 
-  /** Merges new values in. Safe to call while playing. */
-  update(patch: Partial<SessionState>): void {
-    this.state = { ...this.state, ...patch };
-    if (patch.params) this.instrument?.setParams(patch.params);
-  }
+  /**
+   * Hands the session the current song. Cheap and safe to call on every render:
+   * it only touches Web Audio when transport values or the track set change.
+   */
+  setSong(song: Song, scale: Scale): void {
+    const previous = this.song;
+    this.song = song;
+    this.scale = scale;
 
-  setBpm(bpm: number): void {
-    this.scheduler.setBpm(bpm);
-  }
-
-  setStepCount(steps: number): void {
-    this.scheduler.setStepCount(steps);
-  }
-
-  setPolyphony(polyphony: number): void {
-    this.polyphony = polyphony;
-    this.instrument?.setPolyphony(polyphony);
+    if (!previous || previous.bpm !== song.bpm) this.scheduler.setBpm(song.bpm);
+    if (!previous || previous.stepsPerBeat !== song.stepsPerBeat) {
+      this.scheduler.setStepsPerBeat(song.stepsPerBeat);
+    }
+    if (!previous || previous.stepCount !== song.stepCount) {
+      this.scheduler.setStepCount(song.stepCount);
+    }
+    if (this.started) this.syncInstruments();
   }
 
   /** Must be reached from a user gesture, or the context stays suspended. */
   async start(): Promise<void> {
     await this.engine.start();
-    if (!this.instrument) {
-      this.instrument = new Instrument(this.engine, 'lead', this.state.params, this.polyphony);
-    }
-    // Registered on every start so the session survives a dispose/remount,
-    // which React strict mode does on purpose in development.
+    this.started = true;
+    this.syncInstruments();
+    // Re-registered on every start so the session survives a dispose and
+    // remount, which React strict mode does on purpose in development.
     this.scheduler.onStep(this.handleStep);
     this.scheduler.start(0);
   }
 
   stop(): void {
     this.scheduler.stop();
-    this.instrument?.releaseAll();
+    for (const instrument of this.instruments.values()) instrument.releaseAll();
   }
 
   /** Immediate silence, ignoring release tails. */
   panic(): void {
     this.scheduler.stop();
-    this.instrument?.panic();
+    for (const instrument of this.instruments.values()) instrument.panic();
   }
 
   getPlayingStep(): number {
     return this.scheduler.getPlayingStep();
   }
 
-  stats(): { activeVoices: number; polyphony: number; stolenNotes: number; workerClock: boolean | null } {
-    return {
-      activeVoices: this.instrument?.activeVoices() ?? 0,
-      polyphony: this.instrument?.polyphonyLimit ?? this.polyphony,
-      stolenNotes: this.instrument?.stolenNotes ?? 0,
-      workerClock: this.scheduler.usesWorkerClock,
-    };
+  /** Voices sounding across every track, against the summed polyphony caps. */
+  voiceLoad(): { active: number; capacity: number; stolen: number } {
+    let active = 0;
+    let capacity = 0;
+    let stolen = 0;
+    for (const instrument of this.instruments.values()) {
+      active += instrument.activeVoices();
+      capacity += instrument.polyphonyLimit;
+      stolen += instrument.stolenNotes;
+    }
+    return { active, capacity, stolen };
   }
 
   resetStats(): void {
-    if (this.instrument) this.instrument.stolenNotes = 0;
+    for (const instrument of this.instruments.values()) instrument.stolenNotes = 0;
   }
 
   dispose(): void {
     this.scheduler.dispose();
-    this.instrument?.dispose();
-    this.instrument = null;
+    for (const instrument of this.instruments.values()) instrument.dispose();
+    this.instruments.clear();
+    this.started = false;
     void this.engine.dispose();
   }
 
+  /** Creates, updates and retires one Instrument per track. */
+  private syncInstruments(): void {
+    const song = this.song;
+    if (!song || !this.engine.context) return;
+
+    for (const track of song.tracks) {
+      const params = song.instruments[track.instrumentId] ?? DEFAULT_INSTRUMENT;
+      let instrument = this.instruments.get(track.id);
+      if (!instrument) {
+        instrument = new Instrument(this.engine, track.id, params, track.polyphony);
+        this.instruments.set(track.id, instrument);
+      }
+      instrument.setParams(params);
+      instrument.setPolyphony(track.polyphony);
+      instrument.setLevel(track.level);
+    }
+
+    const live = new Set(song.tracks.map((t) => t.id));
+    for (const [id, instrument] of this.instruments) {
+      if (live.has(id)) continue;
+      instrument.dispose();
+      this.instruments.delete(id);
+    }
+  }
+
   private handleStep = (event: StepEvent): void => {
-    const { phrase, scale, gate, velocity } = this.state;
-    if (!this.instrument || phrase.length === 0) return;
+    const song = this.song;
+    if (!song) return;
 
-    const degree = phrase[mod(event.step, phrase.length)];
-    if (degree === null) return;
+    for (const track of song.tracks) {
+      if (!isAudible(song, track)) continue;
+      const step = track.steps[mod(event.step, track.steps.length)];
+      if (!step) continue;
 
-    this.instrument.noteOn({
-      time: event.time,
-      index: scale.indexAt(degree),
-      holdSeconds: event.duration * gate,
-      velocity,
-    });
+      const instrument = this.instruments.get(track.id);
+      if (!instrument) continue;
+
+      instrument.noteOn({
+        time: event.time,
+        index: this.scale.indexAt(step.degree),
+        holdSeconds: event.duration * track.gate,
+        velocity: step.velocity ?? 0.9,
+      });
+    }
   };
 }

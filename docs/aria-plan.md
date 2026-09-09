@@ -304,8 +304,8 @@ shared split, a seeded generator, and an output limiter. Now playable at
 `/programs/aria`. *Deliverable: the prototype's behaviour, on the new engine, in
 tune and in time.*
 
-**Phase 3 — Tracker grid.** The route already exists, so this replaces its
-phrase strip rather than introducing a page. `Song` model, pattern grid with keyboard entry and
+**Phase 3 — Tracker grid. ✅ done.** The route already existed, so this replaced
+its phrase strip rather than introducing a page. `Song` model, pattern grid with keyboard entry and
 navigation, transport bar, per-track mute/solo, loop, follow mode, localStorage
 autosave, multi-track playback. *Deliverable: the actual tracker.*
 
@@ -417,11 +417,52 @@ it never becomes React state.
 Files added: `audio/{Voice,VoicePool,Instrument,InstrumentParams,envelope,softclip,AriaSession}.ts`,
 `lib/generate.ts`, `page.tsx` and `components/` for the route.
 
-## 10. Next steps
+## 10. Phase 3 results
 
-1. **Phase 3:** the `Song` model and the multi-track pattern grid, replacing the
-   single phrase strip on the route.
+`/programs/aria` is a working four-track tracker: rows are steps, columns are
+tracks, keyboard-first, with per-track mute and solo, follow mode, and a
+localStorage autosave.
+
+Verified in the browser: typing the lower key row wrote degrees 0–7 and advanced
+the cursor; `]` shifted entry an octave; `+`/`−` nudged the note under the
+cursor; growing the loop from 16 to 64 steps kept every existing note; follow
+mode scrolled the container as the playhead descended; muting two of four tracks
+dropped voices from 5 to 3; and solo behaved additively — 14 voices with no
+solo, 4 with one track soloed, 5 with two.
+
+**Keyboard entry, adapted rather than copied.** A classic tracker maps two key
+rows to chromatic semitones an octave apart. Aria stores degrees, so the same
+rows map to degrees instead: `z x c v b n m ,` walk the scale from the root and
+`q w e r t y u i` continue an octave above. The muscle memory and the shape of
+the layout survive, and entry stays inside the chosen mode. Digits enter a
+degree directly; `[` and `]` shift the entry octave.
+
+**Two performance decisions the grid forced.** Rows are memoised with an
+element-wise comparator over their step slots, which works because `setStep`
+replaces only the edited slot and leaves every other slot's identity intact — so
+editing one cell re-renders one row. And the playhead, at 60Hz, moves a class on
+the DOM and sets `scrollTop` directly; routing it through React state would
+re-render the whole grid every frame and put render work between the scheduler
+and the audio clock.
+
+**Loading is defensive, not trusting.** Stored JSON can be from an older build,
+hand-edited, or truncated. `parseSong` checks every field and falls back to the
+default, so a partly corrupt save costs the autosave rather than the page.
+
+**The default song now plays something.** An empty grid on first visit means
+pressing play does nothing, which reads as broken rather than blank. `createSong`
+seeds four deterministic parts — bass roots on the downbeats with a turnaround,
+a stepwise lead, an offbeat pluck arpeggio, a sustaining pad.
+
+Files added: `lib/{song,serialize}.ts`, `components/{PatternGrid,TrackHeaders,TrackPanel}.tsx`;
+`AriaSession` rewritten for one Instrument per track. `PhraseStrip` is gone.
+
+## 11. Next steps
+
+1. **Phase 4:** move the generator into a per-track panel with its own stored
+   settings and seed, so each track re-rolls independently.
 2. `npm i @xyflow/react` before phase 5.
-3. Delete `__scratch__/` and `public/aria-scratch/` once the route's own UI
-   covers what the harness proves — or keep the assertions and move them to a
-   real test runner.
+3. The harness at `/aria-scratch/` still holds the 66 assertions. Either move
+   them to a real test runner or retire it once phase 4 lands.
+4. Not yet built from the phase-3 list: the order list / song arrangement, which
+   the plan puts in phase 6 alongside JSON import/export.

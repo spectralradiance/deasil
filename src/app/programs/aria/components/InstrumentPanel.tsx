@@ -6,6 +6,8 @@ import React from 'react';
 import { Box, Stack } from '@mui/material';
 import { Row, SelectField, SliderField } from './ControlRow';
 import { PRESETS, PRESET_NAMES, type InstrumentParams } from '../audio/InstrumentParams';
+import { Field } from './ControlRow';
+import { MenuItem, TextField } from '@mui/material';
 
 const WAVEFORMS = ['sine', 'triangle', 'square', 'sawtooth'] as const;
 const FILTER_TYPES = ['lowpass', 'highpass', 'bandpass', 'notch'] as const;
@@ -13,11 +15,9 @@ const FILTER_TYPES = ['lowpass', 'highpass', 'bandpass', 'notch'] as const;
 interface Props {
   params: InstrumentParams;
   onChange: (params: InstrumentParams) => void;
-  preset: string;
-  onPreset: (name: string) => void;
 }
 
-export default function InstrumentPanel({ params, onChange, preset, onPreset }: Props) {
+export default function InstrumentPanel({ params, onChange }: Props) {
   const set = (patch: Partial<InstrumentParams>) => onChange({ ...params, ...patch });
   const setFilter = (patch: Partial<InstrumentParams['filter']>) =>
     onChange({ ...params, filter: { ...params.filter, ...patch } });
@@ -30,16 +30,23 @@ export default function InstrumentPanel({ params, onChange, preset, onPreset }: 
   return (
     <Stack spacing={2.5}>
       <Row>
-        <SelectField
-          label="preset"
-          value={preset}
-          options={PRESET_NAMES}
-          onChange={(name) => {
-            onPreset(name);
-            onChange(PRESETS[name]);
-          }}
-          width={130}
-        />
+        {/* A one-shot action rather than a selection: instruments are named by
+            the song, so the control loads a preset over the current patch and
+            resets itself. */}
+        <Field label="load preset">
+          <TextField
+            select
+            size="small"
+            value=""
+            onChange={(e) => onChange(PRESETS[e.target.value])}
+            sx={{ width: 130 }}
+            slotProps={{ select: { displayEmpty: true, renderValue: () => 'choose…' } }}
+          >
+            {PRESET_NAMES.map((name) => (
+              <MenuItem key={name} value={name} sx={{ fontSize: 14 }}>{name}</MenuItem>
+            ))}
+          </TextField>
+        </Field>
         <SelectField
           label="waveform"
           value={params.waveform as (typeof WAVEFORMS)[number]}
