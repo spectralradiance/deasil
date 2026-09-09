@@ -298,12 +298,14 @@ through a **scratch harness, not a route** — a standalone
 plays a metronome at a settable BPM and logs step changes.
 *Deliverable: a rock-solid clock.*
 
-**Phase 2 — Voices.** `Voice` (osc → filter → ADSR gain → master), `VoicePool`, a
-hardcoded default instrument. Wire the prototype's melody generator to the
-scheduler. *Deliverable: the current prototype's behavior, on the new engine, in
+**Phase 2 — Voices. ✅ done.** `Voice` (osc → filter → ADSR gain → master),
+`VoicePool` with oldest-first stealing, `Instrument` owning the per-voice /
+shared split, a seeded generator, and an output limiter. Now playable at
+`/programs/aria`. *Deliverable: the prototype's behaviour, on the new engine, in
 tune and in time.*
 
-**Phase 3 — Tracker grid.** `Song` model, pattern grid with keyboard entry and
+**Phase 3 — Tracker grid.** The route already exists, so this replaces its
+phrase strip rather than introducing a page. `Song` model, pattern grid with keyboard entry and
 navigation, transport bar, per-track mute/solo, loop, follow mode, localStorage
 autosave, multi-track playback. *Deliverable: the actual tracker.*
 
@@ -366,10 +368,60 @@ timer if `Worker` or `Blob` is unavailable, and `usesWorkerClock` reports which.
 Files: `lib/{math,tuning,note,scale}.ts`, `audio/{AudioEngine,clock.worker,Scheduler}.ts`,
 harness in `__scratch__/harness.ts` + `public/aria-scratch/`, built by `npm run aria:scratch`.
 
-## 9. Next steps
+## 9. Phase 2 results
 
-1. **Phase 2:** `Voice` (osc → filter → ADSR gain → master), `VoicePool` with
-   stealing, and the prototype's melody generator on the new engine.
+`/programs/aria` plays a seeded phrase through a subtractive voice, and the
+scratch harness stays on as the assertion suite: **66 checks, all passing**,
+including an offline render of a real note.
+
+The scale-degree decision paid off immediately and visibly. Changing the key
+from C3 to F2 mid-loop left the stored degrees untouched (0, 2, 4, 7) and moved
+the notes to F2, G#2, C3, F3 — correct dorian in both keys, without stopping
+playback.
+
+**A clipping bug the offline render test caught.** Rendering one note and
+inspecting the samples showed the default patch peaking at 1.42 full scale, from
+two independent causes:
+
+- Oscillators sum. Two detuned saws at gain 0.5 reached 1.03 on their own. Fixed
+  by dividing the envelope peak by the oscillator count — same result as a gain
+  node per oscillator, without the nodes.
+- A resonant filter is a gain stage. Q=6 turned 1.03 into 1.42; a square wave
+  through Q=20 reached 2.37. This one cannot be normalised away, because
+  resonance is the point.
+
+So the instrument bus now ends in `softclip.ts`: a curve that is *exactly* the
+identity below 0.7 — ordinary playing passes through untouched — and bends
+asymptotically above it. Two details worth keeping in mind:
+
+- A `WaveShaperNode` clamps its lookup to [-1, 1], so a curve written directly
+  over that range would hard-corner anything louder. The pre-gain of
+  1/headroom is what maps a signal several times full scale into the curve's
+  domain and lets the bend actually work.
+- 2x oversampling rings around the bend and overshoots by ~0.3% (measured). The
+  curve's asymptote is therefore 0.99, not 1.0, so the guarantee holds for what
+  reaches the master bus.
+
+**Envelope design.** The whole ADSR is scheduled at note-on, which a tracker can
+do because it knows a note's length before it starts. Cutting a note short needs
+the curve's current value, and `cancelAndHoldAtTime` is missing in Firefox — so
+`valueAt` recomputes it analytically from the plan instead. No browser support
+needed, and it works for future times as well as the present.
+
+**React boundary.** `AriaSession` holds engine, scheduler and instrument, and
+the scheduler's step handler reads a mutable state block the UI overwrites, so
+edits land on the next step without re-registering anything. The playhead runs
+at 60Hz through `requestAnimationFrame` and moves a class on the DOM directly —
+it never becomes React state.
+
+Files added: `audio/{Voice,VoicePool,Instrument,InstrumentParams,envelope,softclip,AriaSession}.ts`,
+`lib/generate.ts`, `page.tsx` and `components/` for the route.
+
+## 10. Next steps
+
+1. **Phase 3:** the `Song` model and the multi-track pattern grid, replacing the
+   single phrase strip on the route.
 2. `npm i @xyflow/react` before phase 5.
-3. Delete `__scratch__/` and `public/aria-scratch/` at phase 3, when the real
-   route replaces them.
+3. Delete `__scratch__/` and `public/aria-scratch/` once the route's own UI
+   covers what the harness proves — or keep the assertions and move them to a
+   real test runner.
