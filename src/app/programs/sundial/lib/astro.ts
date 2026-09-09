@@ -136,6 +136,25 @@ export function getNearestSabbats(now: Date): {
   return { current, last, next };
 }
 
+/** Returns the nearest past and upcoming occurrence of one named sabbat relative to `now` */
+export function getSabbatOccurrence(name: string, now: Date): { next: Date; last: Date } {
+  const year = now.getFullYear();
+  const all = [
+    ...getSabbatDates(year - 1),
+    ...getSabbatDates(year),
+    ...getSabbatDates(year + 1),
+  ]
+    .filter(s => s.name === name)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  let last = all[0].date;
+  let next = all[all.length - 1].date;
+  for (const s of all) {
+    if (s.date.getTime() <= now.getTime()) last = s.date;
+    if (s.date.getTime() > now.getTime()) { next = s.date; break; }
+  }
+  return { next, last };
+}
+
 /** Interpolate between two hex colors by a 0–1 factor */
 export function lerpColor(hex0: string, hex1: string, t: number): string {
   const parse = (h: string) => ({
@@ -210,6 +229,39 @@ const ASPECT_DEFS: { type: Aspect['type']; angle: number; maxOrb: number }[] = [
   { type: 'Trine',       angle: 120, maxOrb: 8 },
   { type: 'Opposition',  angle: 180, maxOrb: 8 },
 ];
+
+// ---- Zodiac sign transition dates ----------------------------
+
+// Mean rate of change of the Sun's ecliptic longitude, degrees/day
+const MEAN_SUN_RATE = 360 / 365.2422;
+
+/** Find the nearest date (forward or backward from `now`) at which the Sun's
+ *  ecliptic longitude crosses `targetLon`, refined via a few Newton-style
+ *  iterations against the actual longitude function.
+ */
+function findSunLongitudeCrossing(targetLon: number, now: Date, direction: 'forward' | 'backward'): Date {
+  const currentLon = calcPlanetLongitudes(now).Sun;
+  const rawDiff = direction === 'forward'
+    ? ((targetLon - currentLon + 360) % 360)
+    : ((currentLon - targetLon + 360) % 360);
+  const sign = direction === 'forward' ? 1 : -1;
+  let estDate = new Date(now.getTime() + sign * (rawDiff / MEAN_SUN_RATE) * 86400000);
+  for (let i = 0; i < 5; i++) {
+    const lonAtEst = calcPlanetLongitudes(estDate).Sun;
+    const err = (((targetLon - lonAtEst + 540) % 360) - 180); // shortest signed diff
+    estDate = new Date(estDate.getTime() + (err / MEAN_SUN_RATE) * 86400000);
+  }
+  return estDate;
+}
+
+/** Returns the nearest past and upcoming date the Sun enters zodiac sign `signIndex` (0=Aries...11=Pisces) */
+export function getZodiacSignOccurrence(signIndex: number, now: Date): { next: Date; last: Date } {
+  const targetLon = signIndex * 30;
+  return {
+    next: findSunLongitudeCrossing(targetLon, now, 'forward'),
+    last: findSunLongitudeCrossing(targetLon, now, 'backward'),
+  };
+}
 
 /** Compute all major aspects among the supplied ecliptic longitudes */
 export function calcAspects(lons: Record<string, number>): Aspect[] {
