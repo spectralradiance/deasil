@@ -84,7 +84,9 @@ a {
   transition: color 0.3s cubic-bezier(.4,2,.6,1) !important;
   font-size: 1.15rem !important;
 }
-.MuiButton-root:hover {
+/* Contained buttons carry their own contrasting text on a filled background;
+   recolouring it on hover leaves gold on gold. */
+.MuiButton-root:not(.MuiButton-contained):hover {
   color: goldenrod !important;
 }
 
@@ -96,7 +98,10 @@ a {
   margin-bottom: 24px;
 }
 
-.MuiButton-root {
+/* Keeps the nav buttons flat against the bar. Scoped to the AppBar: applied
+   globally it also stripped the fill from every contained button, leaving their
+   dark contrast text on the dark page background. */
+.MuiAppBar-root .MuiButton-root {
   background-color: transparent !important;
 }
 
