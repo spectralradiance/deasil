@@ -1,5 +1,5 @@
 import type { AudioEngine } from './AudioEngine';
-import { compileSubgraph, findOutputNode, type CompiledSubgraph } from './compile';
+import { compileSubgraph, findOutputNode, isOfflineContext, type CompiledSubgraph } from './compile';
 import { splitGraph, type GraphSplit, type InstrumentGraph } from './graph';
 import { isEnvelopeNode } from './nodes/registry';
 import { GraphVoice } from './GraphVoice';
@@ -171,9 +171,13 @@ export class GraphInstrument {
     this.shared = compiled;
 
     // Let notes already sounding finish through the old chain before it goes.
-    if (previous) {
+    // Offline never rebuilds mid-render, and a wall-clock timer there could
+    // fire while the render is still running.
+    if (previous && !isOfflineContext(ctx)) {
       const graceMs = 2000;
       setTimeout(() => previous.dispose(), graceMs);
+    } else {
+      previous?.dispose();
     }
   }
 

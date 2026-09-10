@@ -4,11 +4,12 @@
 import React from 'react';
 import { Box, IconButton, Tooltip, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import type { Song } from '../lib/song';
+import type { Pattern, Song } from '../lib/song';
 import { isAudible, MAX_TRACKS } from '../lib/song';
 
 interface Props {
   song: Song;
+  pattern: Pattern;
   selected: number;
   onSelect: (index: number) => void;
   onToggleMute: (trackId: string) => void;
@@ -17,7 +18,7 @@ interface Props {
 }
 
 export default function TrackHeaders({
-  song, selected, onSelect, onToggleMute, onToggleSolo, onAddTrack,
+  song, pattern, selected, onSelect, onToggleMute, onToggleSolo, onAddTrack,
 }: Props) {
   return (
     <Box
@@ -62,7 +63,7 @@ export default function TrackHeaders({
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, maxWidth: '100%' }}>
-              {track.generator.live && (
+              {pattern.lanes[track.id]?.generator.live && (
                 <Tooltip title="Generating live: this track re-rolls from its generator settings">
                   <Box
                     sx={{

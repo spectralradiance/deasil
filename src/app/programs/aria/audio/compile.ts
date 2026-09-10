@@ -111,6 +111,19 @@ export function compileSubgraph(
   };
 }
 
+/**
+ * Whether this context renders offline rather than in real time.
+ *
+ * It matters because an offline context's `currentTime` stays at 0 while the
+ * whole timeline is being scheduled, so anything that converts an audio time
+ * into a wall-clock `setTimeout` computes a delay that can elapse *during* the
+ * render. Offline needs no teardown timers anyway — the context is discarded
+ * whole once rendering finishes.
+ */
+export function isOfflineContext(ctx: BaseAudioContext): boolean {
+  return typeof (ctx as OfflineAudioContext).startRendering === 'function';
+}
+
 /** The node every audible signal must reach. */
 export function findOutputNode(graph: InstrumentGraph): string | null {
   return graph.nodes.find((n) => n.type === 'output')?.id ?? null;

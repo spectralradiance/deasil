@@ -1,4 +1,4 @@
-// Aria — a generative music tracker. Phase 5: the node-graph instrument.
+// Aria — a generative music tracker. Phase 6: arrangement, visualization, I/O.
 // The audio engine lives in audio/ and never touches React; this page only
 // reads and writes the song, and pushes it into the session.
 
@@ -11,9 +11,10 @@ import type { InstrumentGraph } from './audio/graph';
 import { GRAPH_PRESET_NAMES, presetGraph } from './audio/graph-presets';
 import { Scale, type ScaleName } from './lib/scale';
 import {
-  addTrack, clearTrack, createSong, keepTrack, regenerateLiveTracks, regenerateTrack,
-  removeTrack, reseedTrack, rotateTrack, setGenerator, setStep as setSongStep,
-  setStepCount, transposeTrack, updateTrack,
+  addPattern, addTrack, appendToOrder, clearLane, createSong, findPattern, keepLane,
+  moveOrderSlot, regenerateLane, regenerateLiveLanes, removeOrderSlot, removePattern,
+  removeTrack, reseedLane, rotateLane, setGenerator, setOrderSlot,
+  setPatternLength, setStep as setSongStep, transposeLane, updateTrack,
   type Song, type StepSlot, type TrackGenerator,
 } from './lib/song';
 import { loadSong, saveSong } from './lib/serialize';
@@ -22,7 +23,10 @@ import TrackHeaders from './components/TrackHeaders';
 import TrackPanel from './components/TrackPanel';
 import TrackGeneratorPanel from './components/TrackGeneratorPanel';
 import PatternGrid, { type Cursor } from './components/PatternGrid';
+import OrderList from './components/OrderList';
 import SongPanel from './components/SongPanel';
+import SongIO from './components/SongIO';
+import Visualizers from './components/visualizers/Visualizers';
 import GraphEditor from './components/instrument/GraphEditor';
 import NodeInspector from './components/instrument/NodeInspector';
 
@@ -52,10 +56,13 @@ export default function AriaPage() {
   const [song, setSong] = useState<Song>(createSong);
   const [playing, setPlaying] = useState(false);
   const [follow, setFollow] = useState(true);
+  const [loopPattern, setLoopPattern] = useState(true);
   const [cursor, setCursor] = useState<Cursor>({ track: 0, step: 0 });
   const [octaveOffset, setOctaveOffset] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [editingPatternId, setEditingPatternId] = useState<string | null>(null);
+  const [playingIndex, setPlayingIndex] = useState(-1);
 
   // Restore the autosave after mount: localStorage is not available during the
   // server render, and reading it in an effect keeps hydration consistent.
@@ -88,12 +95,34 @@ export default function AriaPage() {
     }
   }, [song.key, song.scaleName]);
 
+  // The pattern open in the grid. Falls back to the first one when the edited
+  // pattern is deleted or a freshly imported song has never seen this id.
+  const pattern = useMemo(
+    () => (editingPatternId ? findPattern(song, editingPatternId) : undefined) ?? song.patterns[0],
+    [song, editingPatternId],
+  );
+
   // The one channel into the engine. Cheap on every render; it only touches Web
   // Audio when transport values or the track set actually change.
   useEffect(() => { session.setSong(song, scale); }, [session, song, scale]);
+  useEffect(() => {
+    session.setLoopPattern(loopPattern ? pattern.id : null);
+  }, [session, loopPattern, pattern.id]);
+
+  // Which order slot is sounding. A readout, not a playhead, so polling a few
+  // times a second is plenty and keeps the frame budget for the grid.
+  useEffect(() => {
+    if (!playing || loopPattern) {
+      setPlayingIndex(-1);
+      return;
+    }
+    const id = setInterval(() => setPlayingIndex(session.getPosition()?.orderIndex ?? -1), 120);
+    return () => clearInterval(id);
+  }, [playing, loopPattern, session]);
 
   const selectedIndex = Math.min(cursor.track, song.tracks.length - 1);
   const selectedTrack = song.tracks[selectedIndex];
+  const lane = selectedTrack ? pattern.lanes[selectedTrack.id] : undefined;
 
   const handlePlay = useCallback(async () => {
     await session.start();
@@ -110,35 +139,40 @@ export default function AriaPage() {
     else void handlePlay();
   }, [playing, handlePlay, handleStop]);
 
-  const readStep = useCallback(() => session.getPlayingStep(), [session]);
+  const readPosition = useCallback(() => session.getPosition(), [session]);
+  const getAnalyser = useCallback(() => session.engine.analyser, [session]);
 
   /**
-   * Hand-editing a live track keeps it first. Without that the edit would
+   * Hand-editing a live lane keeps it first. Without that the edit would
    * survive only until the next re-roll, which is a confusing way to lose work.
    */
   const handleSetStep = useCallback((trackIndex: number, stepIndex: number, step: StepSlot) => {
     setSong((current) => {
       const track = current.tracks[trackIndex];
-      if (!track) return current;
-      const base = track.generator.live ? keepTrack(current, track.id) : current;
-      return setSongStep(base, track.id, stepIndex, step);
+      const target = findPattern(current, pattern.id);
+      if (!track || !target) return current;
+      const base = target.lanes[track.id]?.generator.live
+        ? keepLane(current, target.id, track.id)
+        : current;
+      return setSongStep(base, target.id, track.id, stepIndex, step);
     });
-  }, []);
+  }, [pattern.id]);
 
   const patchGenerator = useCallback((patch: Partial<TrackGenerator>) => {
     if (!selectedTrack) return;
-    setSong((current) => setGenerator(current, selectedTrack.id, patch));
-  }, [selectedTrack]);
+    setSong((current) => setGenerator(current, pattern.id, selectedTrack.id, patch));
+  }, [selectedTrack, pattern.id]);
 
   const handleScale = useCallback((scaleName: ScaleName) => {
-    // Live tracks re-derive: an arpeggio in a pentatonic scale is not the same
+    // Live lanes re-derive: an arpeggio in a pentatonic scale is not the same
     // set of degrees as one in a heptatonic scale.
-    setSong((current) => regenerateLiveTracks({ ...current, scaleName }));
+    setSong((current) => regenerateLiveLanes({ ...current, scaleName }));
   }, []);
 
   const instrumentId = selectedTrack?.instrumentId ?? '';
   const instrumentGraph = song.instruments[instrumentId];
-  const liveCount = song.tracks.filter((t) => t.generator.live).length;
+  const liveCount = song.patterns.reduce(
+    (total, p) => total + Object.values(p.lanes).filter((l) => l.generator.live).length, 0);
 
   const setInstrumentGraph = useCallback((graph: InstrumentGraph) => {
     setSong((c) => ({ ...c, instruments: { ...c.instruments, [instrumentId]: graph } }));
@@ -147,6 +181,12 @@ export default function AriaPage() {
   // Selecting a different patch should not leave the inspector pointing at a
   // node id that only existed in the previous one.
   useEffect(() => { setSelectedNodeId(null); }, [instrumentId]);
+
+  const handleLoadSong = useCallback((next: Song) => {
+    setSong(next);
+    setEditingPatternId(next.patterns[0]?.id ?? null);
+    setCursor({ track: 0, step: 0 });
+  }, []);
 
   return (
     <Box sx={{ maxWidth: 980, mx: 'auto', px: { xs: 2, sm: 3 }, py: 4 }}>
@@ -166,10 +206,13 @@ export default function AriaPage() {
             onStop={handleStop}
             bpm={song.bpm}
             onBpm={(bpm) => setSong((c) => ({ ...c, bpm }))}
-            steps={song.stepCount}
-            onSteps={(steps) => setSong((c) => setStepCount(c, steps))}
+            steps={pattern.stepCount}
+            onSteps={(steps) => setSong((c) => setPatternLength(c, pattern.id, steps))}
             follow={follow}
             onFollow={setFollow}
+            loopPattern={loopPattern}
+            onLoopPattern={setLoopPattern}
+            patternName={pattern.name}
           />
         </Section>
 
@@ -183,8 +226,24 @@ export default function AriaPage() {
           />
         </Section>
 
+        <Section title="Arrangement">
+          <OrderList
+            song={song}
+            editingId={pattern.id}
+            onEdit={setEditingPatternId}
+            playingIndex={playingIndex}
+            loopPattern={loopPattern}
+            onSetSlot={(i, id) => setSong((c) => setOrderSlot(c, i, id))}
+            onAppend={(id) => setSong((c) => appendToOrder(c, id))}
+            onRemoveSlot={(i) => setSong((c) => removeOrderSlot(c, i))}
+            onMoveSlot={(i, d) => setSong((c) => moveOrderSlot(c, i, d))}
+            onAddPattern={(copyFrom) => setSong((c) => addPattern(c, copyFrom))}
+            onRemovePattern={(id) => setSong((c) => removePattern(c, id))}
+          />
+        </Section>
+
         <Section
-          title="Pattern"
+          title={`Pattern ${pattern.name}`}
           action={
             <Typography variant="caption" sx={{ opacity: 0.55 }}>
               octave {octaveOffset >= 0 ? `+${octaveOffset}` : octaveOffset} · [ and ] to shift
@@ -193,6 +252,7 @@ export default function AriaPage() {
         >
           <TrackHeaders
             song={song}
+            pattern={pattern}
             selected={selectedIndex}
             onSelect={(track) => setCursor((c) => ({ ...c, track }))}
             onToggleMute={(id) =>
@@ -202,13 +262,15 @@ export default function AriaPage() {
             onAddTrack={() => setSong(addTrack)}
           />
           <PatternGrid
-            song={song}
+            pattern={pattern}
+            tracks={song.tracks}
+            stepsPerBeat={song.stepsPerBeat}
             scale={scale}
             cursor={cursor}
             onCursor={setCursor}
             onSetStep={handleSetStep}
             onTogglePlay={togglePlay}
-            readStep={readStep}
+            readPosition={readPosition}
             playing={playing}
             follow={follow}
             octaveOffset={octaveOffset}
@@ -223,28 +285,32 @@ export default function AriaPage() {
           </Typography>
         </Section>
 
-        {selectedTrack && (
+        <Section title="Output">
+          <Visualizers getAnalyser={getAnalyser} playing={playing} />
+        </Section>
+
+        {selectedTrack && lane && (
           <Section
-            title={`Generator — ${selectedTrack.name}`}
+            title={`Generator — ${selectedTrack.name} in ${pattern.name}`}
             action={
               liveCount > 0 ? (
                 <Chip
                   size="small"
                   color="primary"
                   variant="outlined"
-                  label={`${liveCount} live track${liveCount === 1 ? '' : 's'}`}
+                  label={`${liveCount} live lane${liveCount === 1 ? '' : 's'}`}
                 />
               ) : undefined
             }
           >
             <TrackGeneratorPanel
-              generator={selectedTrack.generator}
-              stepCount={song.stepCount}
+              generator={lane.generator}
+              stepCount={pattern.stepCount}
               stepsPerBeat={song.stepsPerBeat}
               onChange={patchGenerator}
-              onReseed={() => setSong((c) => reseedTrack(c, selectedTrack.id))}
-              onKeep={() => setSong((c) => keepTrack(c, selectedTrack.id))}
-              onGenerateOnce={() => setSong((c) => regenerateTrack(c, selectedTrack.id))}
+              onReseed={() => setSong((c) => reseedLane(c, pattern.id, selectedTrack.id))}
+              onKeep={() => setSong((c) => keepLane(c, pattern.id, selectedTrack.id))}
+              onGenerateOnce={() => setSong((c) => regenerateLane(c, pattern.id, selectedTrack.id))}
             />
           </Section>
         )}
@@ -255,9 +321,9 @@ export default function AriaPage() {
               song={song}
               track={selectedTrack}
               onPatch={(patch) => setSong((c) => updateTrack(c, selectedTrack.id, patch))}
-              onClear={() => setSong((c) => clearTrack(c, selectedTrack.id))}
-              onRotate={(by) => setSong((c) => rotateTrack(c, selectedTrack.id, by))}
-              onTranspose={(by) => setSong((c) => transposeTrack(c, selectedTrack.id, by))}
+              onClear={() => setSong((c) => clearLane(c, pattern.id, selectedTrack.id))}
+              onRotate={(by) => setSong((c) => rotateLane(c, pattern.id, selectedTrack.id, by))}
+              onTranspose={(by) => setSong((c) => transposeLane(c, pattern.id, selectedTrack.id, by))}
               onRemove={() => setSong((c) => removeTrack(c, selectedTrack.id))}
               canRemove={song.tracks.length > 1}
             />
@@ -298,13 +364,16 @@ export default function AriaPage() {
             </Stack>
           </Section>
         )}
+
+        <Section title="File">
+          <SongIO song={song} onLoad={handleLoadSong} />
+        </Section>
       </Stack>
 
       <Typography variant="caption" sx={{ display: 'block', opacity: 0.5, mt: 3 }}>
-        Phase 5 of{' '}
-        <Box component="span" sx={{ fontStyle: 'italic' }}>docs/aria-plan.md</Box>
-        {' '}— next comes visualization and song arrangement. The song autosaves
-        to this browser.
+        Built to the plan in{' '}
+        <Box component="span" sx={{ fontStyle: 'italic' }}>docs/aria-plan.md</Box>.
+        The song autosaves to this browser.
       </Typography>
     </Box>
   );

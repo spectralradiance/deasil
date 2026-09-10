@@ -1,6 +1,6 @@
 import {
-  createSong, DEFAULT_GENERATOR, MAX_STEPS, MIN_STEPS,
-  type Song, type StepSlot, type Track, type TrackGenerator,
+  createLane, createSong, DEFAULT_GENERATOR, MAX_PATTERNS, MAX_STEPS, MAX_TRACKS, MIN_STEPS,
+  type Lane, type Pattern, type Song, type StepSlot, type Track, type TrackGenerator,
 } from './song';
 import type { PitchKind, RhythmKind } from './generate';
 import { SCALE_PATTERNS, type ScaleName } from './scale';
@@ -23,8 +23,11 @@ import type { GraphEdge, GraphNode, InstrumentGraph } from '../audio/graph';
  * 2: instruments are node graphs. v1 patches migrate losslessly via
  *    graphFromParams — every old patch has an exact graph equivalent, so an
  *    autosave from before the editor existed still sounds the same.
+ * 3: tracks split into channels (Track) and per-pattern content (Lane), with a
+ *    patterns array and an order list. A v2 song becomes one pattern named A
+ *    played once, which is exactly what it was.
  */
-export const SONG_VERSION = 2;
+export const SONG_VERSION = 3;
 export const STORAGE_KEY = 'aria-song';
 
 interface SavedSong {
@@ -162,20 +165,42 @@ function parseGraph(value: unknown): InstrumentGraph | null {
   return { nodes, edges };
 }
 
-function parseTrack(value: unknown, stepCount: number, fallbackInstrument: string): Track | null {
+function parseTrack(value: unknown, fallbackInstrument: string): Track | null {
   if (!isRecord(value)) return null;
-  const rawSteps = Array.isArray(value.steps) ? value.steps : [];
   return {
     id: str(value.id, `t${Math.random().toString(36).slice(2, 8)}`),
     name: str(value.name, 'track'),
     instrumentId: str(value.instrumentId, fallbackInstrument),
-    steps: Array.from({ length: stepCount }, (_, i) => parseStep(rawSteps[i])),
-    generator: parseGenerator(value.generator, stepCount),
     gate: num(value.gate, 0.9, 0.05, 8),
     level: num(value.level, 0.8, 0, 1),
     mute: bool(value.mute, false),
     solo: bool(value.solo, false),
     polyphony: Math.round(num(value.polyphony, 6, 1, 16)),
+  };
+}
+
+function parseLane(value: unknown, stepCount: number): Lane {
+  if (!isRecord(value)) return createLane(stepCount);
+  const rawSteps = Array.isArray(value.steps) ? value.steps : [];
+  return {
+    steps: Array.from({ length: stepCount }, (_, i) => parseStep(rawSteps[i])),
+    generator: parseGenerator(value.generator, stepCount),
+  };
+}
+
+function parsePattern(value: unknown, trackIds: string[]): Pattern | null {
+  if (!isRecord(value)) return null;
+  const stepCount = Math.round(num(value.stepCount, 16, MIN_STEPS, MAX_STEPS));
+  const rawLanes = isRecord(value.lanes) ? value.lanes : {};
+  const lanes: Record<string, Lane> = {};
+  // Keyed by track id, so a lane whose track is gone is simply not carried
+  // over, and a track with no stored lane gets an empty one.
+  for (const id of trackIds) lanes[id] = parseLane(rawLanes[id], stepCount);
+  return {
+    id: str(value.id, `p${Math.random().toString(36).slice(2, 8)}`),
+    name: str(value.name, 'A'),
+    stepCount,
+    lanes,
   };
 }
 
@@ -185,7 +210,6 @@ export function parseSong(raw: unknown): Song {
   if (!isRecord(raw)) return fallback;
 
   const payload = isRecord(raw.song) ? raw.song : raw;
-  const stepCount = Math.round(num(payload.stepCount, fallback.stepCount, MIN_STEPS, MAX_STEPS));
 
   const version = typeof raw.version === 'number' ? raw.version : 1;
   const instrumentsRaw = isRecord(payload.instruments) ? payload.instruments : {};
@@ -207,21 +231,55 @@ export function parseSong(raw: unknown): Song {
 
   const tracksRaw = Array.isArray(payload.tracks) ? payload.tracks : [];
   const tracks = tracksRaw
-    .map((t) => parseTrack(t, stepCount, firstInstrument))
+    .slice(0, MAX_TRACKS)
+    .map((t) => parseTrack(t, firstInstrument))
     .filter((t): t is Track => t !== null);
+  const trackIds = tracks.map((t) => t.id);
+
+  let patterns: Pattern[];
+  let order: string[];
+  if (Array.isArray(payload.patterns) && payload.patterns.length > 0) {
+    patterns = payload.patterns
+      .slice(0, MAX_PATTERNS)
+      .map((p) => parsePattern(p, trackIds))
+      .filter((p): p is Pattern => p !== null);
+    const known = new Set(patterns.map((p) => p.id));
+    const rawOrder = Array.isArray(payload.order) ? payload.order : [];
+    order = rawOrder.filter((id): id is string => typeof id === 'string' && known.has(id));
+    if (order.length === 0 && patterns.length > 0) order = [patterns[0].id];
+  } else {
+    // A v2 song: one pattern's worth of lanes lived on the tracks themselves.
+    const stepCount = Math.round(num(payload.stepCount, 16, MIN_STEPS, MAX_STEPS));
+    const lanes: Record<string, Lane> = {};
+    tracksRaw.forEach((rawTrack, i) => {
+      const id = trackIds[i];
+      if (id) lanes[id] = parseLane(rawTrack, stepCount);
+    });
+    const pattern: Pattern = {
+      id: `p${Math.random().toString(36).slice(2, 8)}`,
+      name: 'A',
+      stepCount,
+      lanes,
+    };
+    patterns = [pattern];
+    order = [pattern.id];
+  }
 
   const scaleName = typeof payload.scaleName === 'string' && payload.scaleName in SCALE_PATTERNS
     ? (payload.scaleName as ScaleName)
     : fallback.scaleName;
 
+  if (tracks.length === 0 || patterns.length === 0) return fallback;
+
   return {
     bpm: num(payload.bpm, fallback.bpm, 20, 300),
     stepsPerBeat: Math.round(num(payload.stepsPerBeat, fallback.stepsPerBeat, 1, 8)),
-    stepCount,
     key: str(payload.key, fallback.key),
     scaleName,
+    tracks,
+    patterns,
+    order,
     instruments,
-    tracks: tracks.length > 0 ? tracks : fallback.tracks,
   };
 }
 

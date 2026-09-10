@@ -4,7 +4,8 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Box } from '@mui/material';
 import type { Scale } from '../lib/scale';
-import type { Song, StepSlot } from '../lib/song';
+import type { Pattern, StepSlot, Track } from '../lib/song';
+import type { Position } from '../audio/AriaSession';
 
 export interface Cursor {
   track: number;
@@ -12,14 +13,16 @@ export interface Cursor {
 }
 
 interface Props {
-  song: Song;
+  pattern: Pattern;
+  tracks: Track[];
+  stepsPerBeat: number;
   scale: Scale;
   cursor: Cursor;
   onCursor: (cursor: Cursor) => void;
   onSetStep: (trackIndex: number, stepIndex: number, step: StepSlot) => void;
   onTogglePlay: () => void;
-  /** Polled for the playing step; -1 when stopped. */
-  readStep: () => number;
+  /** Polled for the arrangement position; null when stopped. */
+  readPosition: () => Position | null;
   playing: boolean;
   follow: boolean;
   /** Degrees added to keyboard entry, in whole scale octaves. */
@@ -139,8 +142,8 @@ const PatternRow = React.memo(function PatternRow({
 }, rowsEqual);
 
 export default function PatternGrid({
-  song, scale, cursor, onCursor, onSetStep, onTogglePlay,
-  readStep, playing, follow, octaveOffset, onOctaveOffset,
+  pattern, tracks, stepsPerBeat, scale, cursor, onCursor, onSetStep, onTogglePlay,
+  readPosition, playing, follow, octaveOffset, onOctaveOffset,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -155,7 +158,10 @@ export default function PatternGrid({
     let painted = -1;
 
     const paint = () => {
-      const step = readStep();
+      // The playhead only belongs on this grid while the arrangement is
+      // actually inside the pattern being displayed.
+      const position = readPosition();
+      const step = position && position.patternId === pattern.id ? position.row : -1;
       if (step !== painted && body) {
         body.children[painted]?.classList.remove('aria-playing');
         const row = body.children[step] as HTMLElement | undefined;
@@ -173,23 +179,23 @@ export default function PatternGrid({
       cancelAnimationFrame(frame);
       if (painted >= 0) body?.children[painted]?.classList.remove('aria-playing');
     };
-  }, [playing, follow, readStep]);
+  }, [playing, follow, readPosition, pattern.id]);
 
   const moveCursor = useCallback(
     (dTrack: number, dStep: number) => {
-      const track = Math.max(0, Math.min(song.tracks.length - 1, cursor.track + dTrack));
-      const step = Math.max(0, Math.min(song.stepCount - 1, cursor.step + dStep));
+      const track = Math.max(0, Math.min(tracks.length - 1, cursor.track + dTrack));
+      const step = Math.max(0, Math.min(pattern.stepCount - 1, cursor.step + dStep));
       onCursor({ track, step });
     },
-    [cursor, song.tracks.length, song.stepCount, onCursor],
+    [cursor, tracks.length, pattern.stepCount, onCursor],
   );
 
   const writeAndAdvance = useCallback(
     (slot: StepSlot) => {
       onSetStep(cursor.track, cursor.step, slot);
-      if (cursor.step < song.stepCount - 1) onCursor({ ...cursor, step: cursor.step + 1 });
+      if (cursor.step < pattern.stepCount - 1) onCursor({ ...cursor, step: cursor.step + 1 });
     },
-    [cursor, song.stepCount, onSetStep, onCursor],
+    [cursor, pattern.stepCount, onSetStep, onCursor],
   );
 
   const handleKey = useCallback(
@@ -202,10 +208,10 @@ export default function PatternGrid({
         case 'ArrowDown': event.preventDefault(); return moveCursor(0, 1);
         case 'ArrowLeft': event.preventDefault(); return moveCursor(-1, 0);
         case 'ArrowRight': event.preventDefault(); return moveCursor(1, 0);
-        case 'PageUp': event.preventDefault(); return moveCursor(0, -song.stepsPerBeat * 4);
-        case 'PageDown': event.preventDefault(); return moveCursor(0, song.stepsPerBeat * 4);
+        case 'PageUp': event.preventDefault(); return moveCursor(0, -stepsPerBeat * 4);
+        case 'PageDown': event.preventDefault(); return moveCursor(0, stepsPerBeat * 4);
         case 'Home': event.preventDefault(); return onCursor({ ...cursor, step: 0 });
-        case 'End': event.preventDefault(); return onCursor({ ...cursor, step: song.stepCount - 1 });
+        case 'End': event.preventDefault(); return onCursor({ ...cursor, step: pattern.stepCount - 1 });
         case 'Tab':
           event.preventDefault();
           return moveCursor(event.shiftKey ? -1 : 1, 0);
@@ -228,7 +234,7 @@ export default function PatternGrid({
 
       // Nudge the note under the cursor rather than replacing it.
       if (key === '+' || key === '=' || key === '-') {
-        const current = song.tracks[cursor.track]?.steps[cursor.step];
+        const current = pattern.lanes[tracks[cursor.track]?.id]?.steps[cursor.step];
         if (current) {
           event.preventDefault();
           onSetStep(cursor.track, cursor.step, {
@@ -252,7 +258,7 @@ export default function PatternGrid({
     },
     [
       cursor, moveCursor, octaveOffset, onCursor, onOctaveOffset, onSetStep,
-      onTogglePlay, scale.size, song.stepsPerBeat, song.stepCount, song.tracks, writeAndAdvance,
+      onTogglePlay, scale.size, stepsPerBeat, pattern, tracks, writeAndAdvance,
     ],
   );
 
@@ -271,8 +277,9 @@ export default function PatternGrid({
   // Built once per song change and reused by every row, so the memo comparator
   // sees stable slot identities for rows that did not change.
   const rows = useMemo(
-    () => Array.from({ length: song.stepCount }, (_, i) => song.tracks.map((t) => t.steps[i] ?? null)),
-    [song.stepCount, song.tracks],
+    () => Array.from({ length: pattern.stepCount }, (_, i) =>
+      tracks.map((t) => pattern.lanes[t.id]?.steps[i] ?? null)),
+    [pattern, tracks],
   );
 
   return (
@@ -304,8 +311,8 @@ export default function PatternGrid({
             scale={scale}
             cursorTrack={cursor.track}
             isCursorRow={i === cursor.step}
-            beat={i % song.stepsPerBeat === 0}
-            bar={i % (song.stepsPerBeat * 4) === 0}
+            beat={i % stepsPerBeat === 0}
+            bar={i % (stepsPerBeat * 4) === 0}
           />
         ))}
       </Box>

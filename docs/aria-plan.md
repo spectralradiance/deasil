@@ -318,10 +318,10 @@ without stopping the loop; "keep" commits the notes as ordinary editable steps.
 graph compiler, React Flow editor, node inspector, the per-voice/shared split,
 preset loading. *Deliverable: the SunVox character.*
 
-**Phase 6 — Visualization and polish.** Oscilloscope, spectrum, per-track meters,
-pattern minimap. Order list / song arrangement. JSON import/export.
-`OfflineAudioContext` WAV bounce. Program icon (`/program-icons/aria.svg`), an
-entry in `programs/page.tsx`, a README section.
+**Phase 6 — Visualization and polish. ✅ done** (except the per-track meters and
+the pattern minimap). Oscilloscope, spectrum, master peak meter. Order list /
+song arrangement. JSON import/export. `OfflineAudioContext` WAV bounce. Program
+icon, listing entry and README section.
 
 **Stretch, in rough priority:** Web MIDI input · MIDI file export · effect-column
 commands (arpeggio, portamento, retrigger) · microtonal scale division · URL
@@ -553,12 +553,75 @@ Files added: `audio/{graph,compile,GraphVoice,GraphInstrument,graph-presets}.ts`
 `InstrumentParams` survives as the preset source and the v1 migration input;
 the old flat `InstrumentPanel` is gone.
 
-## 13. Next steps
+## 13. Phase 6 results
 
-1. **Phase 6:** visualization (oscilloscope, spectrum, meters), the order list /
-   song arrangement, JSON import/export, and the `OfflineAudioContext` bounce.
-2. The hierarchical list view, if it still seems worth having next to the canvas.
+**The song model gained the axis it was missing.** Tracks and patterns are now
+separate, as in every tracker: a **track** is a channel (instrument, level,
+polyphony), a **pattern** holds one **lane** of notes per track, and the
+**order** lists patterns in the sequence they play. Channel config living
+outside the pattern is what lets you mute a track once rather than in every
+pattern you have written. Patterns may differ in length and may repeat in the
+order, so the scheduler runs free and `positionAt` maps its monotonic counter
+onto the arrangement — the wrap point is not a constant it could know.
+Verified: order slots advance 0 → 1 → 2 → 3 → 0 and wrap, and the loop-pattern
+switch detaches one pattern for editing while the grid keeps playing.
+
+**A serious bug the offline render exposed.** Rendering the song produced almost
+nothing: 22 of 146 steps, and only the last few — everything before step 104 was
+silence. Two causes, one shallow and one structural.
+
+- `scheduleCleanup` turned an audio time into a wall-clock `setTimeout`. An
+  offline context's `currentTime` stays at 0 while the whole timeline is being
+  scheduled, so those timers elapsed *during* the render and tore down nodes
+  whose audio had not been produced yet.
+- The real one: a voice's `play()` disposed the previous note's nodes to make
+  room. In real time that is merely wrong — a stolen note has a fade already
+  written onto its timeline, and disposing cuts it off mid-ramp. Offline, where
+  the entire song is scheduled before a single sample is produced, it erased
+  every note but the last one each slot played.
+
+The fix reframes what a voice is. A `GraphVoice` is a *slot* in the polyphony,
+not a note: each note owns its whole chain including the gain it fades out
+through, and a replaced note is **retired** rather than disposed — cleaned up
+only once its scheduled end has actually passed, and never at all offline, where
+the context is discarded whole. Steps with sound went from 22/146 to 129/146,
+overall RMS from 0.038 to 0.180, and the first bar came back from silence.
+
+**The master bus got the limiter its instruments already had.** Each instrument
+limits itself, but four summing on the master still touched full scale — 80
+samples of 1.76M, brief but real, and only invisible because the WAV encoder
+clamps. Routing the master through the same curve took clipped samples to
+**zero** with peak at 0.964 and RMS unchanged, so it is catching peaks rather
+than squashing the signal.
+
+**Migration held again.** A v2 song's per-track steps became one pattern named A
+played once, which is exactly what a v2 song was; generator settings, channel
+config, key, mode and notes all survived, and it re-saved as version 3.
+
+**Rendering is ~45× faster than real time** — 436 ms for a 20-second bounce —
+and the output decodes as a valid 2ch/44.1k/16-bit WAV whose declared size
+matches its bytes. That works only because `audio/` never assumed a live context
+or a React render, which was the plan's first architectural rule.
+
+**Not built:** per-track meters (only the master has one) and the pattern
+minimap. Both are readouts rather than mechanism, and the master meter covers
+the common case.
+
+Files added: `lib/bounce.ts`, `components/{OrderList,SongIO}.tsx`,
+`components/visualizers/Visualizers.tsx`; `lib/song.ts` reshaped around
+tracks/patterns/lanes; `AriaSession` made order-aware.
+
+## 14. Next steps
+
+1. Per-track meters and the pattern minimap, if the master readouts prove not
+   to be enough.
+2. The hierarchical list view of an instrument graph, next to the canvas.
 3. The harness at `/aria-scratch/` still holds the 66 assertions and now covers
-   a shrinking share of the code — none of the graph engine. Move them to a real
-   test runner; the compiler and the split are exactly the kind of pure logic
-   that wants unit tests rather than a page.
+   a shrinking share of the code — none of the graph engine, the arrangement or
+   the bounce. Move them to a real test runner; the compiler, the split and
+   `positionAt` are exactly the kind of pure logic that wants unit tests rather
+   than a page. The voice-retirement bug above is the argument: it was found by
+   listening to a rendered file, and a unit test over the offline render would
+   have caught it in seconds.
+4. The stretch list from §7 — Web MIDI, MIDI export, effect columns, microtonal
+   divisions, and the live-coding expression field.

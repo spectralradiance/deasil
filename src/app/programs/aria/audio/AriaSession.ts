@@ -3,7 +3,7 @@ import { Scheduler, type StepEvent } from './Scheduler';
 import { GraphInstrument } from './GraphInstrument';
 import { presetGraph } from './graph-presets';
 import { Scale } from '../lib/scale';
-import { isAudible, type Song } from '../lib/song';
+import { findPattern, isAudible, positionAt, type Song } from '../lib/song';
 import { mod } from '../lib/math';
 
 /**
@@ -15,9 +15,17 @@ import { mod } from '../lib/math';
  * the mode lands on the next scheduled step without re-registering anything and
  * without interrupting playback.
  *
- * One Instrument per *track*, not per patch. Two tracks sharing a patch id still
- * need separate voice pools, or a busy track would steal the other's voices.
+ * One GraphInstrument per *track*, not per patch. Two tracks sharing a patch id
+ * still need separate voice pools, or a busy track would steal the other's
+ * voices.
  */
+
+export interface Position {
+  orderIndex: number;
+  row: number;
+  patternId: string;
+}
+
 export class AriaSession {
   readonly engine: AudioEngine;
   readonly scheduler: Scheduler;
@@ -27,9 +35,14 @@ export class AriaSession {
   private instruments = new Map<string, GraphInstrument>();
   private started = false;
 
+  /** When set, that pattern loops instead of the order list playing through. */
+  private loopPatternId: string | null = null;
+
   constructor() {
     this.engine = new AudioEngine({ masterVolume: 0.7 });
-    this.scheduler = new Scheduler(this.engine, { bpm: 110, stepsPerBeat: 4, stepCount: 16 });
+    // Free-running: patterns may differ in length, so the wrap point is not a
+    // constant the scheduler could know. positionAt does the mapping instead.
+    this.scheduler = new Scheduler(this.engine, { bpm: 110, stepsPerBeat: 4, stepCount: 0 });
   }
 
   get isPlaying(): boolean {
@@ -49,10 +62,29 @@ export class AriaSession {
     if (!previous || previous.stepsPerBeat !== song.stepsPerBeat) {
       this.scheduler.setStepsPerBeat(song.stepsPerBeat);
     }
-    if (!previous || previous.stepCount !== song.stepCount) {
-      this.scheduler.setStepCount(song.stepCount);
-    }
     if (this.started) this.syncInstruments();
+  }
+
+  /** Loops one pattern, for editing. Pass null to follow the order list. */
+  setLoopPattern(patternId: string | null): void {
+    this.loopPatternId = patternId;
+  }
+
+  /** Where the arrangement is right now, or null when stopped. */
+  getPosition(): Position | null {
+    const song = this.song;
+    const step = this.scheduler.getPlayingStep();
+    if (!song || step < 0) return null;
+
+    if (this.loopPatternId) {
+      const pattern = findPattern(song, this.loopPatternId);
+      if (!pattern || pattern.stepCount <= 0) return null;
+      return { orderIndex: -1, row: mod(step, pattern.stepCount), patternId: pattern.id };
+    }
+
+    const position = positionAt(song, step);
+    if (!position) return null;
+    return { ...position, patternId: song.order[position.orderIndex] };
   }
 
   /** Must be reached from a user gesture, or the context stays suspended. */
@@ -75,10 +107,6 @@ export class AriaSession {
   panic(): void {
     this.scheduler.stop();
     for (const instrument of this.instruments.values()) instrument.panic();
-  }
-
-  getPlayingStep(): number {
-    return this.scheduler.getPlayingStep();
   }
 
   /** Voices sounding across every track, against the summed polyphony caps. */
@@ -106,7 +134,7 @@ export class AriaSession {
     void this.engine.dispose();
   }
 
-  /** Creates, updates and retires one Instrument per track. */
+  /** Creates, updates and retires one instrument per track. */
   private syncInstruments(): void {
     const song = this.song;
     if (!song || !this.engine.context) return;
@@ -135,9 +163,25 @@ export class AriaSession {
     const song = this.song;
     if (!song) return;
 
+    // Resolve which pattern and row this step lands on. Doing it here rather
+    // than in the scheduler is what lets patterns have different lengths.
+    let pattern;
+    let row;
+    if (this.loopPatternId) {
+      pattern = findPattern(song, this.loopPatternId);
+      if (!pattern || pattern.stepCount <= 0) return;
+      row = mod(event.step, pattern.stepCount);
+    } else {
+      const position = positionAt(song, event.step);
+      if (!position) return;
+      pattern = findPattern(song, song.order[position.orderIndex]);
+      row = position.row;
+    }
+    if (!pattern) return;
+
     for (const track of song.tracks) {
       if (!isAudible(song, track)) continue;
-      const step = track.steps[mod(event.step, track.steps.length)];
+      const step = pattern.lanes[track.id]?.steps[row];
       if (!step) continue;
 
       const instrument = this.instruments.get(track.id);

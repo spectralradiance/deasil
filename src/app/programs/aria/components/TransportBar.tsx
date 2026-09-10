@@ -19,10 +19,14 @@ interface Props {
   onSteps: (steps: number) => void;
   follow: boolean;
   onFollow: (follow: boolean) => void;
+  loopPattern: boolean;
+  onLoopPattern: (loop: boolean) => void;
+  patternName: string;
 }
 
 export default function TransportBar({
   session, playing, onPlay, onStop, bpm, onBpm, steps, onSteps, follow, onFollow,
+  loopPattern, onLoopPattern, patternName,
 }: Props) {
   const [load, setLoad] = useState({ active: 0, capacity: 0, stolen: 0 });
 
@@ -61,7 +65,7 @@ export default function TransportBar({
         onChange={onBpm}
       />
       <SliderField
-        label="loop length"
+        label={`pattern ${patternName} length`}
         value={steps}
         min={4}
         max={64}
@@ -69,6 +73,14 @@ export default function TransportBar({
         format={(v) => `${v} steps`}
         onChange={onSteps}
       />
+
+      <Tooltip title={`Cycle pattern ${patternName} instead of playing the order list through`}>
+        <FormControlLabel
+          sx={{ mb: 0.25 }}
+          control={<Switch size="small" checked={loopPattern} onChange={(e) => onLoopPattern(e.target.checked)} />}
+          label={<Box sx={{ fontSize: 13 }}>loop pattern</Box>}
+        />
+      </Tooltip>
 
       <Tooltip title="Keep the playing row centred. Turn it off to edit somewhere else while the loop runs.">
         <FormControlLabel

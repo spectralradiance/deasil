@@ -5,6 +5,8 @@
  * The same class drives an OfflineAudioContext for offline WAV rendering later.
  */
 
+import { createSoftClip, type SoftClip } from './softclip';
+
 type AnyWindow = typeof globalThis & {
   webkitAudioContext?: typeof AudioContext;
 };
@@ -26,6 +28,8 @@ export interface AudioEngineOptions {
 export class AudioEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private masterAnalyser: AnalyserNode | null = null;
+  private masterSafety: SoftClip | null = null;
   private volume: number;
   private readonly rampSeconds: number;
 
@@ -55,6 +59,11 @@ export class AudioEngine {
     return this.masterGain;
   }
 
+  /** Master-bus analyser, or null before `start()`. */
+  get analyser(): AnalyserNode | null {
+    return this.masterAnalyser;
+  }
+
   /** Context clock in seconds. Returns 0 before start, so callers can poll safely. */
   get currentTime(): number {
     return this.ctx?.currentTime ?? 0;
@@ -75,7 +84,17 @@ export class AudioEngine {
       this.ctx = new Ctor({ latencyHint: 'interactive' });
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.volume;
-      this.masterGain.connect(this.ctx.destination);
+      // Each instrument limits itself, but several summing on the master can
+      // still cross full scale, so the same curve guards the bus. The analyser
+      // sits after it and passes signal through untouched, so the visualizers
+      // show exactly what leaves the speakers.
+      this.masterSafety = createSoftClip(this.ctx);
+      this.masterAnalyser = this.ctx.createAnalyser();
+      this.masterAnalyser.fftSize = 2048;
+      this.masterAnalyser.smoothingTimeConstant = 0.75;
+      this.masterGain.connect(this.masterSafety.input);
+      this.masterSafety.output.connect(this.masterAnalyser);
+      this.masterAnalyser.connect(this.ctx.destination);
     }
     if (this.ctx.state !== 'running') {
       await this.ctx.resume();
@@ -111,6 +130,8 @@ export class AudioEngine {
     const ctx = this.ctx;
     this.ctx = null;
     this.masterGain = null;
+    this.masterAnalyser = null;
+    this.masterSafety = null;
     if (ctx && ctx.state !== 'closed') await ctx.close();
   }
 }
