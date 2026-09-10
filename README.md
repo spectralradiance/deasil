@@ -88,6 +88,52 @@ show hamburger menu on each page, expand to show icons
 - important events in history that happened today?
 - ecospiritual reflection?
 
+### Aria
+
+A generative music tracker. Patterns are written in **scale degrees** rather
+than pitches, so changing the key or the mode re-voices the whole arrangement
+at once instead of transposing recorded notes.
+
+#### Features
+
+- Multi-track pattern grid, keyboard-first
+  - `z x c v b n m ,` are scale degrees 0–7; `q w e r t y u i` continue an octave above
+  - digits enter a degree directly, `[` and `]` shift the entry octave
+  - arrows move, Tab changes track, `+` / `−` nudge the note under the cursor, Space plays
+- Arrangement: several patterns, an order list they play through, and a
+  loop-pattern mode for editing one in place
+- Per-lane generation — pitch (walk, arpeggio, drone) and rhythm (every,
+  euclidean, random) are generated separately and combined, so changing the
+  groove leaves the melody alone. Seeded, so a phrase is reproducible; **live**
+  re-rolls against the running loop and **keep** commits it as editable notes
+- Instruments as node graphs: oscillator, noise, gain, filter, envelope, LFO,
+  drive, delay, reverb, pan, wired on a canvas
+- Oscilloscope, spectrum and peak meter on the master bus
+- Autosave to the browser, JSON import/export, and WAV render
+
+#### Notes
+
+The audio engine under `src/app/programs/aria/audio/` imports nothing from
+React. That is what lets the same code drive an `OfflineAudioContext` and render
+a song to WAV faster than real time, and it is why the scheduler can run ahead
+of the audio clock without waiting on a render.
+
+Instruments split at the amplitude envelope: everything upstream is rebuilt per
+note, everything downstream is shared by the whole instrument. Each module on
+the canvas says which side it is on. It is the difference between one
+convolution reverb per instrument and one per note.
+
+The design and its reasoning are in [docs/aria-plan.md](docs/aria-plan.md).
+
+#### Todo
+
+- Hierarchical list view of an instrument graph, as an alternative to the canvas
+- Move the assertions in `public/aria-scratch/` to a real test runner
+- Web MIDI input, MIDI file export
+- Effect columns in the grid (arpeggio, portamento, retrigger)
+- Microtonal scale divisions — the tuning layer already supports them
+- A small live-coding expression field per track, over the generator API
+
 ### Altar
 
 #### Features

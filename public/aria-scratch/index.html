@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Aria — engine scratch harness</title>
+<style>
+  :root { color-scheme: light dark; --line: #8883; }
+  body {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    margin: 0; padding: 2rem; line-height: 1.5; max-width: 960px;
+  }
+  h1 { font-size: 1.2rem; margin: 0 0 .25rem; letter-spacing: .04em; }
+  .sub { opacity: .6; font-size: .8rem; }
+  section { border-top: 1px solid var(--line); padding: 1.25rem 0; }
+  h2 { font-size: .75rem; text-transform: uppercase; letter-spacing: .12em; opacity: .6; margin: 0 0 1rem; }
+  .row { display: flex; flex-wrap: wrap; gap: 1rem 1.25rem; align-items: flex-end; }
+  label { display: block; font-size: .7rem; opacity: .6; margin-bottom: .35rem; letter-spacing: .06em; }
+  input[type=range] { width: 130px; display: block; }
+  input[type=text] { width: 70px; padding: .3rem; font: inherit; }
+  select { padding: .3rem; font: inherit; }
+  button {
+    font: inherit; padding: .45rem 1.1rem; border: 1px solid currentColor;
+    background: none; color: inherit; cursor: pointer; border-radius: 2px;
+  }
+  button[disabled] { opacity: .3; cursor: default; }
+  button.small { padding: .2rem .6rem; font-size: .8rem; }
+  .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
+  .readout .v { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+  .readout .k { font-size: .66rem; opacity: .55; letter-spacing: .08em; text-transform: uppercase; }
+  #phrase { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: .75rem; }
+  #phrase .cell {
+    min-width: 2.1rem; padding: .4rem .2rem; text-align: center;
+    border: 1px solid var(--line); border-radius: 2px; font-variant-numeric: tabular-nums;
+  }
+  #phrase .cell.on { background: currentColor; color: Canvas; }
+  #checks { font-size: .78rem; columns: 2; column-gap: 2rem; }
+  #checks div { break-inside: avoid; }
+  .ok { color: #2e7d32; }
+  .bad { color: #c62828; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { .ok { color: #81c784; } .bad { color: #ef9a9a; } }
+  code { background: #8881; padding: .1em .35em; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<h1>Aria — engine scratch harness</h1>
+<div class="sub" style="margin-bottom:2rem">
+  phases 1–2: worker clock, lookahead scheduler, ported Note / Scale / tuning,
+  voices with ADSR and filter, voice pool with stealing, seeded generation.
+</div>
+
+<section>
+  <h2>Transport</h2>
+  <div class="row">
+    <div><label for="bpm">bpm <span id="bpm-value"></span></label>
+      <input id="bpm" type="range" min="40" max="220" step="1" value="110" /></div>
+    <div><label for="steps">loop steps <span id="steps-value"></span></label>
+      <input id="steps" type="range" min="4" max="64" step="4" value="16" /></div>
+    <div><label for="mode">mode</label>
+      <select id="mode">
+        <option value="phrase" selected>phrase</option>
+        <option value="metronome">metronome</option>
+      </select></div>
+    <div><label for="poly">polyphony <span id="poly-value"></span></label>
+      <input id="poly" type="range" min="1" max="16" step="1" value="8" /></div>
+    <div>
+      <button id="play">play</button>
+      <button id="stop" disabled>stop</button>
+      <button id="panic" class="small">panic</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Phrase</h2>
+  <div id="phrase"></div>
+  <div class="row">
+    <div><label for="generator">generator</label>
+      <select id="generator">
+        <option value="random" selected>seeded walk</option>
+        <option value="arpeggio">arpeggio</option>
+      </select></div>
+    <div><label for="scale">scale</label><select id="scale"></select></div>
+    <div><label for="root">root</label><input id="root" type="text" value="C3" /></div>
+    <div><label for="low">low degree <span id="low-value"></span></label>
+      <input id="low" type="range" min="-14" max="0" step="1" value="-5" /></div>
+    <div><label for="high">high degree <span id="high-value"></span></label>
+      <input id="high" type="range" min="0" max="14" step="1" value="7" /></div>
+    <div><label for="rests">rest density <span id="rests-value"></span></label>
+      <input id="rests" type="range" min="0" max="0.7" step="0.05" value="0.15" /></div>
+    <div><label for="stepwise">stepwise <span id="stepwise-value"></span></label>
+      <input id="stepwise" type="range" min="0" max="1" step="0.05" value="0.7" /></div>
+    <div><button id="reseed">reseed</button></div>
+  </div>
+  <div class="sub" style="margin-top:.75rem">
+    seed <code id="seed-value"></code> — same seed, same phrase. Cells show scale
+    degrees; hover for the note name. Rests are <code>·</code>.
+  </div>
+</section>
+
+<section>
+  <h2>Instrument</h2>
+  <div class="row">
+    <div><label for="preset">preset</label><select id="preset"></select></div>
+    <div><label for="waveform">waveform</label>
+      <select id="waveform">
+        <option value="sine">sine</option>
+        <option value="triangle">triangle</option>
+        <option value="square">square</option>
+        <option value="sawtooth">sawtooth</option>
+      </select></div>
+    <div><label for="spread">detune spread <span id="spread-value"></span></label>
+      <input id="spread" type="range" min="0" max="40" step="1" value="8" /></div>
+    <div><label for="filtertype">filter</label>
+      <select id="filtertype">
+        <option value="lowpass">lowpass</option>
+        <option value="highpass">highpass</option>
+        <option value="bandpass">bandpass</option>
+        <option value="notch">notch</option>
+      </select></div>
+    <div><label for="cutoff">cutoff <span id="cutoff-value"></span></label>
+      <input id="cutoff" type="range" min="80" max="8000" step="20" value="1200" /></div>
+    <div><label for="q">resonance <span id="q-value"></span></label>
+      <input id="q" type="range" min="0.1" max="20" step="0.1" value="6" /></div>
+    <div><label for="filterenv">filter env <span id="filterenv-value"></span></label>
+      <input id="filterenv" type="range" min="0" max="6000" step="50" value="2400" /></div>
+  </div>
+  <div class="row" style="margin-top:1rem">
+    <div><label for="attack">attack <span id="attack-value"></span></label>
+      <input id="attack" type="range" min="0.001" max="1" step="0.001" value="0.005" /></div>
+    <div><label for="decay">decay <span id="decay-value"></span></label>
+      <input id="decay" type="range" min="0.005" max="1.5" step="0.005" value="0.12" /></div>
+    <div><label for="sustain">sustain <span id="sustain-value"></span></label>
+      <input id="sustain" type="range" min="0" max="1" step="0.01" value="0.55" /></div>
+    <div><label for="release">release <span id="release-value"></span></label>
+      <input id="release" type="range" min="0.005" max="2" step="0.005" value="0.18" /></div>
+    <div><label for="gain">gain <span id="gain-value"></span></label>
+      <input id="gain" type="range" min="0" max="1" step="0.01" value="0.5" /></div>
+    <div><label for="gate">gate <span id="gate-value"></span></label>
+      <input id="gate" type="range" min="0.05" max="4" step="0.05" value="0.9" /></div>
+    <div><label for="velocity">velocity <span id="velocity-value"></span></label>
+      <input id="velocity" type="range" min="0.05" max="1" step="0.05" value="0.9" /></div>
+  </div>
+  <div class="sub" style="margin-top:.75rem">
+    Gate above 1 holds notes past their step so they overlap — that is what
+    exercises polyphony and, past the cap, voice stealing.
+  </div>
+</section>
+
+<section>
+  <h2>Engine health</h2>
+  <div class="readouts">
+    <div class="readout"><div class="v" id="step">--</div><div class="k">playing step</div></div>
+    <div class="readout"><div class="v" id="voices">—</div><div class="k">active voices</div></div>
+    <div class="readout"><div class="v" id="stolen">—</div><div class="k">stolen notes</div></div>
+    <div class="readout"><div class="v" id="lead">—</div><div class="k">min schedule lead</div></div>
+    <div class="readout"><div class="v" id="late">0 / 0</div><div class="k">late / scheduled</div></div>
+    <div class="readout"><div class="v" id="clock" style="font-size:1rem">—</div><div class="k">timer source</div></div>
+  </div>
+  <p class="sub" style="margin:1rem 0 0">
+    <strong>min schedule lead</strong> is how close the scheduler ever came to missing its window;
+    it should stay well above zero, and <strong>late</strong> must remain 0. Background this tab for
+    a minute, come back, and both should be unchanged — that is the worker clock earning its keep.
+    <button id="reset-stats" class="small">reset</button>
+  </p>
+</section>
+
+<section>
+  <h2>Checks — <span id="checks-summary">running…</span></h2>
+  <div id="checks"></div>
+  <p class="sub" style="margin:1rem 0 0">
+    Covers the three prototype bugs (<code>mod()</code> at exact negative multiples, the downward
+    scale walk, <code>harmonic_minor</code> summing to 13), the envelope curve, generator
+    determinism, voice stealing, and an offline render of one note checked for a click-free onset.
+  </p>
+</section>
+
+<script src="./bundle.js"></script>
+</body>
+</html>
