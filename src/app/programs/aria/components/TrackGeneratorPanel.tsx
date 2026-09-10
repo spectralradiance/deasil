@@ -3,11 +3,22 @@
 
 'use client';
 import React from 'react';
-import { Box, Button, Chip, FormControlLabel, Stack, Switch, Tooltip, Typography } from '@mui/material';
+import { Box, Button, Chip, Stack, Tooltip, Typography } from '@mui/material';
 import CasinoIcon from '@mui/icons-material/Casino';
 import LockIcon from '@mui/icons-material/Lock';
-import { Field, Row, SelectField, SliderField } from './ControlRow';
-import type { TrackGenerator } from '../lib/song';
+import BoltIcon from '@mui/icons-material/Bolt';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import SouthIcon from '@mui/icons-material/South';
+import NorthIcon from '@mui/icons-material/North';
+import StairsIcon from '@mui/icons-material/Stairs';
+import GridOnIcon from '@mui/icons-material/GridOn';
+import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
+import RotateRightIcon from '@mui/icons-material/RotateRight';
+import BlurOnIcon from '@mui/icons-material/BlurOn';
+import { Field, Row, SelectField, SliderField, ToggleField } from './ControlRow';
+import PianoRoll from './PianoRoll';
+import type { Scale } from '../lib/scale';
+import type { StepSlot, TrackGenerator } from '../lib/song';
 import type { PitchKind, RhythmKind } from '../lib/generate';
 import { euclideanRhythm } from '../lib/generate';
 
@@ -18,6 +29,11 @@ interface Props {
   generator: TrackGenerator;
   stepCount: number;
   stepsPerBeat: number;
+  /** The lane's notes, for the piano roll. */
+  steps: StepSlot[];
+  scale: Scale;
+  /** The track's gate, so note lengths in the roll match what plays. */
+  gate: number;
   onChange: (patch: Partial<TrackGenerator>) => void;
   onReseed: () => void;
   onKeep: () => void;
@@ -52,23 +68,28 @@ function RhythmPreview({ generator, stepCount, stepsPerBeat }: {
 }
 
 export default function TrackGeneratorPanel({
-  generator, stepCount, stepsPerBeat, onChange, onReseed, onKeep, onGenerateOnce,
+  generator, stepCount, stepsPerBeat, steps, scale, gate,
+  onChange, onReseed, onKeep, onGenerateOnce,
 }: Props) {
   const { live } = generator;
 
   return (
     <Stack spacing={2.5}>
       <Row>
-        <Field label="generate">
+        <ToggleField
+          label="live"
+          icon={<BoltIcon />}
+          help="While live, this lane is re-derived from the settings below: move a slider against the running loop and hear it change. Typing a note turns it off and keeps what is there."
+          checked={live}
+          onChange={(value) => onChange({ live: value })}
+        />
+        <Field
+          label="actions"
+          icon={<CasinoIcon />}
+          help="Reseed rolls new pitches, leaving the rhythm alone. Keep freezes the current notes as ordinary editable steps."
+        >
           <Stack direction="row" spacing={1} alignItems="center">
-            <Tooltip title="While live, the track is re-derived from these settings — move a slider against the running loop and hear it change.">
-              <FormControlLabel
-                sx={{ m: 0 }}
-                control={<Switch size="small" checked={live} onChange={(e) => onChange({ live: e.target.checked })} />}
-                label={<Box sx={{ fontSize: 13 }}>live</Box>}
-              />
-            </Tooltip>
-            <Tooltip title="Roll a new seed">
+            <Tooltip title="Roll a new seed: new pitches, same rhythm">
               <Button size="small" variant="outlined" startIcon={<CasinoIcon />} onClick={onReseed}>
                 reseed
               </Button>
@@ -86,7 +107,11 @@ export default function TrackGeneratorPanel({
                 </Button>
               </Tooltip>
             )}
-            {live && <Chip size="small" color="primary" variant="outlined" label={`seed ${generator.seed}`} />}
+            {live && (
+              <Tooltip title="The number the pitches derive from. The same seed and settings always give the same phrase.">
+                <Chip size="small" color="primary" variant="outlined" label={`seed ${generator.seed}`} />
+              </Tooltip>
+            )}
           </Stack>
         </Field>
       </Row>
@@ -94,13 +119,19 @@ export default function TrackGeneratorPanel({
       <Row>
         <SelectField
           label="pitch"
+          icon={<ShowChartIcon />}
+          help="How the notes are chosen. Walk wanders the scale, arpeggio cycles a triad, drone repeats one degree."
           value={generator.pitch}
           options={PITCH_KINDS}
           onChange={(pitch) => onChange({ pitch })}
           width={120}
         />
         <SliderField
-          label={generator.pitch === 'drone' ? 'degree' : 'lowest degree'}
+          label={generator.pitch === 'drone' ? 'degree' : 'lowest'}
+          icon={<SouthIcon />}
+          help={generator.pitch === 'drone'
+            ? 'The single scale degree to repeat. Degree 0 is the key.'
+            : 'The lowest scale degree the walk may reach. Negative degrees sit below the key.'}
           value={generator.low}
           min={-14}
           max={14}
@@ -111,7 +142,9 @@ export default function TrackGeneratorPanel({
         {generator.pitch === 'walk' && (
           <>
             <SliderField
-              label="highest degree"
+              label="highest"
+              icon={<NorthIcon />}
+              help="The highest scale degree the walk may reach. In a seven-note mode, degree 7 is one octave above the key."
               value={generator.high}
               min={-14}
               max={14}
@@ -121,6 +154,8 @@ export default function TrackGeneratorPanel({
             />
             <SliderField
               label="stepwise"
+              icon={<StairsIcon />}
+              help="At 0 each degree is picked independently. At 1 every note is a step or a third from the last, which is most of the difference between random and intended."
               value={generator.stepwise}
               min={0}
               max={1}
@@ -136,6 +171,8 @@ export default function TrackGeneratorPanel({
       <Row>
         <SelectField
           label="rhythm"
+          icon={<GridOnIcon />}
+          help="Which steps carry a note. Generated separately from pitch, so changing the groove leaves the melody alone."
           value={generator.rhythm}
           options={RHYTHM_KINDS}
           onChange={(rhythm) => onChange({ rhythm })}
@@ -145,6 +182,8 @@ export default function TrackGeneratorPanel({
           <>
             <SliderField
               label="pulses"
+              icon={<RadioButtonCheckedIcon />}
+              help="How many notes to spread as evenly as the step count allows. 3 of 8 is the tresillo; 4 of 16 is four to the floor."
               value={Math.min(generator.pulses, stepCount)}
               min={0}
               max={stepCount}
@@ -155,6 +194,8 @@ export default function TrackGeneratorPanel({
             />
             <SliderField
               label="rotate"
+              icon={<RotateRightIcon />}
+              help="Shifts the whole rhythm later in the bar, so it can start somewhere other than the downbeat."
               value={generator.rotation}
               min={0}
               max={Math.max(1, stepCount - 1)}
@@ -167,6 +208,8 @@ export default function TrackGeneratorPanel({
         {generator.rhythm === 'random' && (
           <SliderField
             label="density"
+            icon={<BlurOnIcon />}
+            help="The chance that any given step carries a note."
             value={generator.density}
             min={0}
             max={1}
@@ -179,6 +222,13 @@ export default function TrackGeneratorPanel({
       </Row>
 
       <RhythmPreview generator={generator} stepCount={stepCount} stepsPerBeat={stepsPerBeat} />
+
+      <Box>
+        <Typography variant="caption" sx={{ opacity: 0.65, display: 'block', mb: 0.75 }}>
+          notes
+        </Typography>
+        <PianoRoll steps={steps} scale={scale} stepsPerBeat={stepsPerBeat} gate={gate} />
+      </Box>
 
       <Typography variant="caption" sx={{ opacity: 0.6 }}>
         Rhythm and pitch are generated separately: the rhythm decides <em>when</em>{' '}
