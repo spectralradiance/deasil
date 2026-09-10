@@ -56,7 +56,9 @@ export default function AriaPage() {
   const [song, setSong] = useState<Song>(createSong);
   const [playing, setPlaying] = useState(false);
   const [follow, setFollow] = useState(true);
-  const [loopPattern, setLoopPattern] = useState(true);
+  // Play means play the song: the arrangement runs through the order list.
+  // Looping one pattern is an editing mode you opt into.
+  const [loopPattern, setLoopPattern] = useState(false);
   const [cursor, setCursor] = useState<Cursor>({ track: 0, step: 0 });
   const [octaveOffset, setOctaveOffset] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -189,7 +191,7 @@ export default function AriaPage() {
   }, []);
 
   return (
-    <Box sx={{ maxWidth: 980, mx: 'auto', px: { xs: 2, sm: 3 }, py: 4 }}>
+    <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 }, py: 4 }}>
       <Typography variant="h4" sx={{ mb: 0.5 }}>Aria</Typography>
       <Typography variant="body2" sx={{ opacity: 0.65, mb: 3 }}>
         A generative tracker. Patterns are written in scale degrees and played by
@@ -198,6 +200,10 @@ export default function AriaPage() {
       </Typography>
 
       <Stack spacing={2.5}>
+        <Section title="Output">
+          <Visualizers getAnalyser={getAnalyser} playing={playing} height={96} />
+        </Section>
+
         <Section title="Transport">
           <TransportBar
             session={session}
@@ -242,6 +248,15 @@ export default function AriaPage() {
           />
         </Section>
 
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 2.5,
+            // The grid needs the room; the generator is a column of controls.
+            gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 3fr) minmax(380px, 2fr)' },
+            alignItems: 'start',
+          }}
+        >
         <Section
           title={`Pattern ${pattern.name}`}
           action={
@@ -285,10 +300,6 @@ export default function AriaPage() {
           </Typography>
         </Section>
 
-        <Section title="Output">
-          <Visualizers getAnalyser={getAnalyser} playing={playing} />
-        </Section>
-
         {selectedTrack && lane && (
           <Section
             title={`Generator — ${selectedTrack.name} in ${pattern.name}`}
@@ -307,6 +318,9 @@ export default function AriaPage() {
               generator={lane.generator}
               stepCount={pattern.stepCount}
               stepsPerBeat={song.stepsPerBeat}
+              steps={lane.steps}
+              scale={scale}
+              gate={selectedTrack.gate}
               onChange={patchGenerator}
               onReseed={() => setSong((c) => reseedLane(c, pattern.id, selectedTrack.id))}
               onKeep={() => setSong((c) => keepLane(c, pattern.id, selectedTrack.id))}
@@ -314,6 +328,7 @@ export default function AriaPage() {
             />
           </Section>
         )}
+        </Box>
 
         {selectedTrack && (
           <Section title={`Track — ${selectedTrack.name}`}>
