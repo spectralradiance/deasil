@@ -4,6 +4,8 @@
 'use client';
 import React from 'react';
 import { Stack, TextField, Typography } from '@mui/material';
+import PianoIcon from '@mui/icons-material/Piano';
+import TuneIcon from '@mui/icons-material/Tune';
 import { Field, Row, SelectField } from './ControlRow';
 import { SCALE_NAMES, type ScaleName } from '../lib/scale';
 
@@ -19,7 +21,11 @@ export default function SongPanel({ songKey, scaleName, onKey, onScale, keyError
   return (
     <Stack spacing={1.5}>
       <Row>
-        <Field label="key">
+        <Field
+          label="key"
+          icon={<PianoIcon />}
+          help="The root note every degree is measured from, e.g. C3 or F#2. Degree 0 is this note."
+        >
           <TextField
             size="small"
             value={songKey}
@@ -31,6 +37,8 @@ export default function SongPanel({ songKey, scaleName, onKey, onScale, keyError
         </Field>
         <SelectField
           label="mode"
+          icon={<TuneIcon />}
+          help="Which scale the degrees are read through. Changing it re-voices every pattern at once — nothing is transposed, because nothing stored a pitch."
           value={scaleName}
           options={SCALE_NAMES}
           onChange={onScale}
