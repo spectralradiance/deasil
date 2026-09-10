@@ -49,6 +49,12 @@ interface Props {
   playing: boolean;
   onPlay: () => void;
   onStop: () => void;
+  /** Writes one step of this lane, from the piano roll. */
+  onSetStep: (index: number, slot: StepSlot) => void;
+  /** Polled for the playing row within this pattern; -1 when not playing it. */
+  readRow: () => number;
+  /** True whenever this pattern is sounding, whatever the scope. */
+  patternPlaying: boolean;
   onChange: (patch: Partial<TrackGenerator>) => void;
   onReseed: () => void;
   onKeep: () => void;
@@ -87,7 +93,7 @@ function RhythmPreview({ generator, stepCount, stepsPerBeat }: {
 export default function TrackGeneratorPanel({
   generator, stepCount, stepsPerBeat, steps, scale, gate,
   lane, songKey, songScaleName, trackInstrumentId, instrumentIds, onLaneChange,
-  playing, onPlay, onStop,
+  playing, onPlay, onStop, onSetStep, readRow, patternPlaying,
   onChange, onReseed, onKeep, onGenerateOnce,
 }: Props) {
   const { live } = generator;
@@ -327,7 +333,15 @@ export default function TrackGeneratorPanel({
         <Typography variant="caption" sx={{ opacity: 0.65, display: 'block', mb: 0.75 }}>
           notes
         </Typography>
-        <PianoRoll steps={steps} scale={scale} stepsPerBeat={stepsPerBeat} gate={gate} />
+        <PianoRoll
+          steps={steps}
+          scale={scale}
+          stepsPerBeat={stepsPerBeat}
+          gate={gate}
+          onSetStep={onSetStep}
+          readRow={readRow}
+          playing={patternPlaying}
+        />
       </Box>
 
       <Typography variant="caption" sx={{ opacity: 0.6 }}>

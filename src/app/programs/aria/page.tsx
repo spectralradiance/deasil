@@ -186,6 +186,13 @@ export default function AriaPage() {
     : null;
 
   const readPosition = useCallback(() => session.getPosition(), [session]);
+
+  // The roll only wants the row, and only while the pattern it shows is the one
+  // sounding — the arrangement may well be somewhere else entirely.
+  const readPatternRow = useCallback((): number => {
+    const position = session.getPosition();
+    return position && position.patternId === pattern.id ? position.row : -1;
+  }, [session, pattern.id]);
   const getAnalyser = useCallback(() => session.engine.analyser, [session]);
 
   /**
@@ -396,6 +403,9 @@ export default function AriaPage() {
               playing={laneScope !== null && isScopePlaying(laneScope)}
               onPlay={() => { if (laneScope) void startWithScope(laneScope); }}
               onStop={handleStop}
+              onSetStep={(index, slot) => handleSetStep(selectedIndex, index, slot)}
+              readRow={readPatternRow}
+              patternPlaying={playing}
               onChange={patchGenerator}
               onReseed={() => setSong((c) => reseedLane(c, pattern.id, selectedTrack.id))}
               onKeep={() => setSong((c) => keepLane(c, pattern.id, selectedTrack.id))}
