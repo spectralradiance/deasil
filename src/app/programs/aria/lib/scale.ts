@@ -90,6 +90,33 @@ export class Scale {
     return this.root.index + this.offsetOf(degree);
   }
 
+  /**
+   * The scale degree nearest a chromatic pitch index.
+   *
+   * The inverse of `indexAt`, and lossy on purpose: a chromatic index between
+   * two degrees snaps to the closer one. That is what lets a piano roll drawn
+   * with twelve rows per octave edit music stored as degrees — drag a note and
+   * it lands in the scale rather than between it.
+   */
+  degreeOf(index: number): number {
+    const offset = index - this.root.index;
+    const octaves = Math.floor(offset / this.span);
+    const remainder = offset - octaves * this.span;
+
+    let best = 0;
+    let bestDistance = Infinity;
+    // cumulative[size] is the octave above, i.e. degree `size` — including it
+    // means an index just under the next root snaps up rather than down.
+    for (let i = 0; i <= this.size; ++i) {
+      const distance = Math.abs(this.cumulative[i] - remainder);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = i;
+      }
+    }
+    return octaves * this.size + best;
+  }
+
   /** True when a pitch index falls on a degree of this scale. */
   contains(index: number): boolean {
     // mod keeps the offset in [0, span), so it can only match cumulative[0..size-1].
