@@ -1,13 +1,14 @@
-// Aria — a generative music tracker. Phase 4: per-track generation.
+// Aria — a generative music tracker. Phase 5: the node-graph instrument.
 // The audio engine lives in audio/ and never touches React; this page only
 // reads and writes the song, and pushes it into the session.
 
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Chip, Paper, Stack, Typography } from '@mui/material';
+import { Box, Chip, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { AriaSession } from './audio/AriaSession';
-import { DEFAULT_INSTRUMENT } from './audio/InstrumentParams';
+import type { InstrumentGraph } from './audio/graph';
+import { GRAPH_PRESET_NAMES, presetGraph } from './audio/graph-presets';
 import { Scale, type ScaleName } from './lib/scale';
 import {
   addTrack, clearTrack, createSong, keepTrack, regenerateLiveTracks, regenerateTrack,
@@ -22,7 +23,8 @@ import TrackPanel from './components/TrackPanel';
 import TrackGeneratorPanel from './components/TrackGeneratorPanel';
 import PatternGrid, { type Cursor } from './components/PatternGrid';
 import SongPanel from './components/SongPanel';
-import InstrumentPanel from './components/InstrumentPanel';
+import GraphEditor from './components/instrument/GraphEditor';
+import NodeInspector from './components/instrument/NodeInspector';
 
 function Section({ title, action, children }: {
   title: string;
@@ -53,6 +55,7 @@ export default function AriaPage() {
   const [cursor, setCursor] = useState<Cursor>({ track: 0, step: 0 });
   const [octaveOffset, setOctaveOffset] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   // Restore the autosave after mount: localStorage is not available during the
   // server render, and reading it in an effect keeps hydration consistent.
@@ -134,8 +137,16 @@ export default function AriaPage() {
   }, []);
 
   const instrumentId = selectedTrack?.instrumentId ?? '';
-  const instrumentParams = song.instruments[instrumentId] ?? DEFAULT_INSTRUMENT;
+  const instrumentGraph = song.instruments[instrumentId];
   const liveCount = song.tracks.filter((t) => t.generator.live).length;
+
+  const setInstrumentGraph = useCallback((graph: InstrumentGraph) => {
+    setSong((c) => ({ ...c, instruments: { ...c.instruments, [instrumentId]: graph } }));
+  }, [instrumentId]);
+
+  // Selecting a different patch should not leave the inspector pointing at a
+  // node id that only existed in the previous one.
+  useEffect(() => { setSelectedNodeId(null); }, [instrumentId]);
 
   return (
     <Box sx={{ maxWidth: 980, mx: 'auto', px: { xs: 2, sm: 3 }, py: 4 }}>
@@ -253,20 +264,47 @@ export default function AriaPage() {
           </Section>
         )}
 
-        <Section title={`Instrument — ${instrumentId}`}>
-          <InstrumentPanel
-            params={instrumentParams}
-            onChange={(params) =>
-              setSong((c) => ({ ...c, instruments: { ...c.instruments, [instrumentId]: params } }))}
-          />
-        </Section>
+        {instrumentGraph && (
+          <Section
+            title={`Instrument — ${instrumentId}`}
+            action={
+              <TextField
+                select
+                size="small"
+                value=""
+                onChange={(e) => setInstrumentGraph(presetGraph(e.target.value))}
+                sx={{ width: 150 }}
+                slotProps={{ select: { displayEmpty: true, renderValue: () => 'load preset…' } }}
+              >
+                {GRAPH_PRESET_NAMES.map((name) => (
+                  <MenuItem key={name} value={name} sx={{ fontSize: 14 }}>{name}</MenuItem>
+                ))}
+              </TextField>
+            }
+          >
+            <Stack spacing={2.5}>
+              <GraphEditor
+                graph={instrumentGraph}
+                onChange={setInstrumentGraph}
+                selectedNodeId={selectedNodeId}
+                onSelectNode={setSelectedNodeId}
+              />
+              <NodeInspector
+                graph={instrumentGraph}
+                onChange={setInstrumentGraph}
+                selectedNodeId={selectedNodeId}
+                onSelectNode={setSelectedNodeId}
+              />
+            </Stack>
+          </Section>
+        )}
       </Stack>
 
       <Typography variant="caption" sx={{ display: 'block', opacity: 0.5, mt: 3 }}>
-        Phase 4 of{' '}
+        Phase 5 of{' '}
         <Box component="span" sx={{ fontStyle: 'italic' }}>docs/aria-plan.md</Box>
-        {' '}— next comes the node-graph instrument editor. The song autosaves to
-        this browser.
+        {' '}— next comes visualization and song arrangement. The song autosaves
+        to this browser.
       </Typography>
     </Box>
   );

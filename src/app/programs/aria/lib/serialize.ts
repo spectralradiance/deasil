@@ -5,6 +5,9 @@ import {
 import type { PitchKind, RhythmKind } from './generate';
 import { SCALE_PATTERNS, type ScaleName } from './scale';
 import { DEFAULT_INSTRUMENT, type InstrumentParams } from '../audio/InstrumentParams';
+import { definitionFor } from '../audio/nodes/registry';
+import { graphFromParams, presetGraph } from '../audio/graph-presets';
+import type { GraphEdge, GraphNode, InstrumentGraph } from '../audio/graph';
 
 /**
  * Save and load, with the version field that makes later migrations possible.
@@ -15,7 +18,13 @@ import { DEFAULT_INSTRUMENT, type InstrumentParams } from '../audio/InstrumentPa
  * default, so a partially corrupt save still opens.
  */
 
-export const SONG_VERSION = 1;
+/**
+ * 1: instruments were flat InstrumentParams.
+ * 2: instruments are node graphs. v1 patches migrate losslessly via
+ *    graphFromParams — every old patch has an exact graph equivalent, so an
+ *    autosave from before the editor existed still sounds the same.
+ */
+export const SONG_VERSION = 2;
 export const STORAGE_KEY = 'aria-song';
 
 interface SavedSong {
@@ -108,6 +117,51 @@ function parseGenerator(value: unknown, stepCount: number): TrackGenerator {
   };
 }
 
+function parseGraphNode(value: unknown): GraphNode | null {
+  if (!isRecord(value)) return null;
+  const type = typeof value.type === 'string' ? value.type : '';
+  const definition = definitionFor(type);
+  if (!definition) return null;
+
+  const rawParams = isRecord(value.params) ? value.params : {};
+  const params: Record<string, number | string> = {};
+  for (const def of definition.params) {
+    params[def.name] = num(rawParams[def.name], def.default, def.min, def.max);
+  }
+  for (const def of definition.choices) {
+    const raw = rawParams[def.name];
+    params[def.name] = typeof raw === 'string' && def.options.includes(raw) ? raw : def.default;
+  }
+
+  const pos = isRecord(value.position) ? value.position : {};
+  return {
+    id: str(value.id, `${type}-${Math.random().toString(36).slice(2, 8)}`),
+    type,
+    params,
+    position: { x: num(pos.x, 0, -20000, 20000), y: num(pos.y, 0, -20000, 20000) },
+  };
+}
+
+function parseGraph(value: unknown): InstrumentGraph | null {
+  if (!isRecord(value) || !Array.isArray(value.nodes)) return null;
+  const nodes = value.nodes.map(parseGraphNode).filter((n): n is GraphNode => n !== null);
+  if (nodes.length === 0) return null;
+
+  const ids = new Set(nodes.map((n) => n.id));
+  const rawEdges = Array.isArray(value.edges) ? value.edges : [];
+  const edges: GraphEdge[] = [];
+  for (const raw of rawEdges) {
+    if (!isRecord(raw) || !isRecord(raw.from) || !isRecord(raw.to)) continue;
+    const from = { node: str(raw.from.node, ''), port: str(raw.from.port, 'out') };
+    const to = { node: str(raw.to.node, ''), port: str(raw.to.port, 'in') };
+    // Drop edges pointing at nodes that did not survive parsing, rather than
+    // leaving the compiler to trip over them.
+    if (!ids.has(from.node) || !ids.has(to.node)) continue;
+    edges.push({ id: str(raw.id, `e${edges.length}`), from, to });
+  }
+  return { nodes, edges };
+}
+
 function parseTrack(value: unknown, stepCount: number, fallbackInstrument: string): Track | null {
   if (!isRecord(value)) return null;
   const rawSteps = Array.isArray(value.steps) ? value.steps : [];
@@ -133,10 +187,20 @@ export function parseSong(raw: unknown): Song {
   const payload = isRecord(raw.song) ? raw.song : raw;
   const stepCount = Math.round(num(payload.stepCount, fallback.stepCount, MIN_STEPS, MAX_STEPS));
 
+  const version = typeof raw.version === 'number' ? raw.version : 1;
   const instrumentsRaw = isRecord(payload.instruments) ? payload.instruments : {};
-  const instruments: Record<string, InstrumentParams> = {};
-  for (const [id, params] of Object.entries(instrumentsRaw)) {
-    instruments[id] = parseInstrument(params);
+  const instruments: Record<string, InstrumentGraph> = {};
+  for (const [id, value] of Object.entries(instrumentsRaw)) {
+    // Either shape may turn up regardless of the stated version, so decide by
+    // looking at the value: a graph has nodes, a v1 patch has a waveform.
+    const graph = version >= 2 ? parseGraph(value) : null;
+    if (graph) {
+      instruments[id] = graph;
+    } else if (isRecord(value) && Array.isArray(value.nodes)) {
+      instruments[id] = parseGraph(value) ?? presetGraph('default');
+    } else {
+      instruments[id] = graphFromParams(parseInstrument(value));
+    }
   }
   if (Object.keys(instruments).length === 0) Object.assign(instruments, fallback.instruments);
   const firstInstrument = Object.keys(instruments)[0];

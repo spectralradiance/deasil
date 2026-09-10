@@ -314,9 +314,9 @@ degree range, rhythm kind, pulses, rotation, density, seed. Re-rolls live
 without stopping the loop; "keep" commits the notes as ordinary editable steps.
 *Deliverable: the Sonic Pi character.*
 
-**Phase 5 — Instrument graph.** Node registry, `InstrumentGraph` compiler, React
-Flow editor, node inspector, the per-voice/shared split, preset save/load,
-hierarchical list view. *Deliverable: the SunVox character.*
+**Phase 5 — Instrument graph. ✅ done** (except the list view). Node registry,
+graph compiler, React Flow editor, node inspector, the per-voice/shared split,
+preset loading. *Deliverable: the SunVox character.*
 
 **Phase 6 — Visualization and polish.** Oscilloscope, spectrum, per-track meters,
 pattern minimap. Order list / song arrangement. JSON import/export.
@@ -501,11 +501,64 @@ Files added: `components/{TrackGeneratorPanel,SongPanel}.tsx`, rhythm and
 composed generation in `lib/generate.ts`, `TrackGenerator` in `lib/song.ts`.
 The old song-level `GeneratorPanel` is gone.
 
-## 12. Next steps
+## 12. Phase 5 results
 
-1. **Phase 5:** the node-graph instrument editor — `npm i @xyflow/react` first.
-2. The harness at `/aria-scratch/` still holds the 66 assertions and no longer
-   covers the newer lib code. Move them to a real test runner rather than
-   growing it further.
-3. Still unbuilt: the order list / song arrangement, and JSON import/export,
-   both of which the plan puts in phase 6.
+Instruments are node graphs now. Ten module types — oscillator, noise, gain,
+filter, envelope, LFO, drive, delay, reverb, pan — plus the output bus, wired on
+a React Flow canvas and compiled independently by the audio layer.
+
+**The split is the whole point, and it is visible.** Every module on the canvas
+carries a VOICE or SHARED badge, and the count sits under the palette. Loading
+the `space` preset gives *10 modules · 7 per voice · 3 shared*, with Delay,
+Reverb and Output on the shared side — verified in the browser. That is the
+guarantee the architecture exists to enforce: a convolution reverb is built once
+per instrument, never once per note.
+
+The amp node is found structurally rather than by name — it is the gain whose
+level an envelope drives — so the split follows the patch instead of a
+convention the user has to know about.
+
+**Three things a graph editor has to get right, each verified:**
+
+- **A delay-free feedback cycle is refused with the path named.** Web Audio only
+  resolves a loop when a delay sits inside it and silently drops any other, so
+  the editor says so rather than shipping a patch that mysteriously makes no
+  sound.
+- **A patch with no envelope still sounds.** Everything becomes per-voice, an
+  explanatory note appears, and the audio still reaches the bus — every voice
+  owns an exit gain, which also means a voice can always be faded out
+  click-free even with no envelope to ride down.
+- **Modulation has defined semantics.** Web Audio *adds* an incoming signal to a
+  param, so a gain sitting at 1 with an envelope patched in would swing 1..2 and
+  never shape anything. `ParamDef.modulationBase` settles it per param: a gain's
+  level zeroes when modulated, a filter cutoff stays as the centre the
+  modulation moves around. The inspector greys the knob and says which applies.
+
+**Migration, which is what the version field was for.** Songs saved before the
+editor existed hold flat patches; `graphFromParams` gives every one an exact
+graph equivalent, so they open and sound the same rather than resetting. Checked
+with a real v1 payload: a square/±14¢/bandpass-850Hz/Q9 patch came back as two
+oscillators, a filter, a gain, two envelopes and an output, with key, mode and
+notes intact, and re-saved as version 2. Loading is still defensive — unknown
+node types and edges pointing at nodes that did not survive parsing are dropped
+rather than left for the compiler to trip over.
+
+**Not built: the hierarchical list view.** The plan called it a phase-5 nicety
+and a projection of the graph rather than a second data model, and that is still
+the right shape for it — but it is not done, and the canvas is the only way to
+edit a patch today.
+
+Files added: `audio/{graph,compile,GraphVoice,GraphInstrument,graph-presets}.ts`,
+`audio/nodes/registry.ts`, `components/instrument/{GraphEditor,SynthNode,NodeInspector}.tsx`.
+`InstrumentParams` survives as the preset source and the v1 migration input;
+the old flat `InstrumentPanel` is gone.
+
+## 13. Next steps
+
+1. **Phase 6:** visualization (oscilloscope, spectrum, meters), the order list /
+   song arrangement, JSON import/export, and the `OfflineAudioContext` bounce.
+2. The hierarchical list view, if it still seems worth having next to the canvas.
+3. The harness at `/aria-scratch/` still holds the 66 assertions and now covers
+   a shrinking share of the code — none of the graph engine. Move them to a real
+   test runner; the compiler and the split are exactly the kind of pure logic
+   that wants unit tests rather than a page.

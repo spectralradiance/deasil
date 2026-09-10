@@ -1,7 +1,7 @@
 import { AudioEngine } from './AudioEngine';
 import { Scheduler, type StepEvent } from './Scheduler';
-import { Instrument } from './Instrument';
-import { DEFAULT_INSTRUMENT } from './InstrumentParams';
+import { GraphInstrument } from './GraphInstrument';
+import { presetGraph } from './graph-presets';
 import { Scale } from '../lib/scale';
 import { isAudible, type Song } from '../lib/song';
 import { mod } from '../lib/math';
@@ -24,7 +24,7 @@ export class AriaSession {
 
   private song: Song | null = null;
   private scale = new Scale('C3', 'dorian');
-  private instruments = new Map<string, Instrument>();
+  private instruments = new Map<string, GraphInstrument>();
   private started = false;
 
   constructor() {
@@ -112,13 +112,13 @@ export class AriaSession {
     if (!song || !this.engine.context) return;
 
     for (const track of song.tracks) {
-      const params = song.instruments[track.instrumentId] ?? DEFAULT_INSTRUMENT;
+      const graph = song.instruments[track.instrumentId] ?? presetGraph('default');
       let instrument = this.instruments.get(track.id);
       if (!instrument) {
-        instrument = new Instrument(this.engine, track.id, params, track.polyphony);
+        instrument = new GraphInstrument(this.engine, track.id, graph, track.polyphony);
         this.instruments.set(track.id, instrument);
       }
-      instrument.setParams(params);
+      instrument.setGraph(graph);
       instrument.setPolyphony(track.polyphony);
       instrument.setLevel(track.level);
     }

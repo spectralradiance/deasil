@@ -1,5 +1,5 @@
-import type { InstrumentParams } from '../audio/InstrumentParams';
-import { DEFAULT_INSTRUMENT, PRESETS } from '../audio/InstrumentParams';
+import type { InstrumentGraph } from '../audio/graph';
+import { presetGraph } from '../audio/graph-presets';
 import { SCALE_PATTERNS, type ScaleName } from './scale';
 import { mod } from './math';
 import {
@@ -89,7 +89,8 @@ export interface Song {
   key: string;
   scaleName: ScaleName;
   tracks: Track[];
-  instruments: Record<string, InstrumentParams>;
+  /** Patches by id; a track names the one it plays. */
+  instruments: Record<string, InstrumentGraph>;
 }
 
 export const MIN_STEPS = 4;
@@ -161,10 +162,10 @@ export function createSong(): Song {
     key: 'C3',
     scaleName: 'dorian',
     instruments: {
-      lead: PRESETS.default ?? DEFAULT_INSTRUMENT,
-      bass: PRESETS.bass,
-      pluck: PRESETS.pluck,
-      pad: PRESETS.pad,
+      lead: presetGraph('default'),
+      bass: presetGraph('bass'),
+      pluck: presetGraph('pluck'),
+      pad: presetGraph('pad'),
     },
     tracks: [
       createTrack('lead', 'lead', stepCount, { steps: toSteps(lead, stepCount) }),
