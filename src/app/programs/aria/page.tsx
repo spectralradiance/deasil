@@ -5,8 +5,10 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Chip, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
-import { AriaSession } from './audio/AriaSession';
+import { Box, Button, Chip, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
+import { AriaSession, SONG_SCOPE, type PlayScope } from './audio/AriaSession';
 import type { InstrumentGraph } from './audio/graph';
 import { GRAPH_PRESET_NAMES, presetGraph } from './audio/graph-presets';
 import { Scale, type ScaleName } from './lib/scale';
@@ -14,8 +16,8 @@ import {
   addPattern, addTrack, appendToOrder, clearLane, createSong, findPattern, keepLane,
   moveOrderSlot, regenerateLane, regenerateLiveLanes, removeOrderSlot, removePattern,
   removeTrack, reseedLane, rotateLane, setGenerator, setOrderSlot,
-  setPatternLength, setStep as setSongStep, transposeLane, updateTrack,
-  type Song, type StepSlot, type TrackGenerator,
+  setPatternLength, setStep as setSongStep, transposeLane, updateLane, updateTrack,
+  type Lane, type Song, type StepSlot, type TrackGenerator,
 } from './lib/song';
 import { loadSong, saveSong } from './lib/serialize';
 import TransportBar from './components/TransportBar';
@@ -57,8 +59,10 @@ export default function AriaPage() {
   const [playing, setPlaying] = useState(false);
   const [follow, setFollow] = useState(true);
   // Play means play the song: the arrangement runs through the order list.
-  // Looping one pattern is an editing mode you opt into.
+  // Looping one pattern, or soloing one lane, is an editing mode you opt into
+  // from that panel's own play button.
   const [loopPattern, setLoopPattern] = useState(false);
+  const [scope, setScope] = useState<PlayScope>(SONG_SCOPE);
   const [cursor, setCursor] = useState<Cursor>({ track: 0, step: 0 });
   const [octaveOffset, setOctaveOffset] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -107,29 +111,52 @@ export default function AriaPage() {
   // The one channel into the engine. Cheap on every render; it only touches Web
   // Audio when transport values or the track set actually change.
   useEffect(() => { session.setSong(song, scale); }, [session, song, scale]);
+  useEffect(() => { session.setScope(scope); }, [session, scope]);
+
+  // The transport's loop switch is just a shortcut for the pattern scope.
   useEffect(() => {
-    session.setLoopPattern(loopPattern ? pattern.id : null);
-  }, [session, loopPattern, pattern.id]);
+    setScope((current) => {
+      if (loopPattern) return { kind: 'pattern', patternId: pattern.id };
+      return current.kind === 'pattern' ? SONG_SCOPE : current;
+    });
+  }, [loopPattern, pattern.id]);
 
   // Which order slot is sounding. A readout, not a playhead, so polling a few
   // times a second is plenty and keeps the frame budget for the grid.
   useEffect(() => {
-    if (!playing || loopPattern) {
+    if (!playing || scope.kind !== 'song') {
       setPlayingIndex(-1);
       return;
     }
     const id = setInterval(() => setPlayingIndex(session.getPosition()?.orderIndex ?? -1), 120);
     return () => clearInterval(id);
-  }, [playing, loopPattern, session]);
+  }, [playing, scope, session]);
 
   const selectedIndex = Math.min(cursor.track, song.tracks.length - 1);
   const selectedTrack = song.tracks[selectedIndex];
   const lane = selectedTrack ? pattern.lanes[selectedTrack.id] : undefined;
 
-  const handlePlay = useCallback(async () => {
-    await session.start();
+  // The lane may sit in its own key or mode, so the piano roll has to name its
+  // pitches through that scale rather than the song's.
+  const laneScale = useMemo(() => {
+    const key = lane?.key ?? song.key;
+    const scaleName = lane?.scaleName ?? song.scaleName;
+    try {
+      return new Scale(key, scaleName);
+    } catch {
+      return scale;
+    }
+  }, [lane?.key, lane?.scaleName, song.key, song.scaleName, scale]);
+
+  const startWithScope = useCallback(async (next: PlayScope) => {
+    setScope(next);
+    await session.start(next);
     setPlaying(true);
   }, [session]);
+
+  const handlePlay = useCallback(() => {
+    void startWithScope(loopPattern ? { kind: 'pattern', patternId: pattern.id } : SONG_SCOPE);
+  }, [startWithScope, loopPattern, pattern.id]);
 
   const handleStop = useCallback(() => {
     session.stop();
@@ -138,8 +165,25 @@ export default function AriaPage() {
 
   const togglePlay = useCallback(() => {
     if (playing) handleStop();
-    else void handlePlay();
+    else handlePlay();
   }, [playing, handlePlay, handleStop]);
+
+  /** True when playback is running and covering exactly this scope. */
+  const isScopePlaying = useCallback((candidate: PlayScope): boolean => {
+    if (!playing || scope.kind !== candidate.kind) return false;
+    if (candidate.kind === 'song') return true;
+    if (candidate.kind === 'pattern') {
+      return scope.kind === 'pattern' && scope.patternId === candidate.patternId;
+    }
+    return scope.kind === 'lane'
+      && scope.patternId === candidate.patternId
+      && scope.trackId === candidate.trackId;
+  }, [playing, scope]);
+
+  const patternScope: PlayScope = { kind: 'pattern', patternId: pattern.id };
+  const laneScope: PlayScope | null = selectedTrack
+    ? { kind: 'lane', patternId: pattern.id, trackId: selectedTrack.id }
+    : null;
 
   const readPosition = useCallback(() => session.getPosition(), [session]);
   const getAnalyser = useCallback(() => session.engine.analyser, [session]);
@@ -160,6 +204,11 @@ export default function AriaPage() {
     });
   }, [pattern.id]);
 
+  const patchLane = useCallback((patch: Partial<Lane>) => {
+    if (!selectedTrack) return;
+    setSong((current) => updateLane(current, pattern.id, selectedTrack.id, patch));
+  }, [selectedTrack, pattern.id]);
+
   const patchGenerator = useCallback((patch: Partial<TrackGenerator>) => {
     if (!selectedTrack) return;
     setSong((current) => setGenerator(current, pattern.id, selectedTrack.id, patch));
@@ -171,7 +220,7 @@ export default function AriaPage() {
     setSong((current) => regenerateLiveLanes({ ...current, scaleName }));
   }, []);
 
-  const instrumentId = selectedTrack?.instrumentId ?? '';
+  const instrumentId = lane?.instrumentId ?? selectedTrack?.instrumentId ?? '';
   const instrumentGraph = song.instruments[instrumentId];
   const liveCount = song.patterns.reduce(
     (total, p) => total + Object.values(p.lanes).filter((l) => l.generator.live).length, 0);
@@ -260,9 +309,26 @@ export default function AriaPage() {
         <Section
           title={`Pattern ${pattern.name}`}
           action={
-            <Typography variant="caption" sx={{ opacity: 0.55 }}>
-              octave {octaveOffset >= 0 ? `+${octaveOffset}` : octaveOffset} · [ and ] to shift
-            </Typography>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Typography variant="caption" sx={{ opacity: 0.55 }}>
+                octave {octaveOffset >= 0 ? `+${octaveOffset}` : octaveOffset} · [ and ] to shift
+              </Typography>
+              {isScopePlaying(patternScope) ? (
+                <Button size="small" variant="contained" startIcon={<StopIcon />} onClick={handleStop}>
+                  stop
+                </Button>
+              ) : (
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={<PlayArrowIcon />}
+                  onClick={() => void startWithScope(patternScope)}
+                  title={`Loop pattern ${pattern.name} on its own`}
+                >
+                  play
+                </Button>
+              )}
+            </Stack>
           }
         >
           <TrackHeaders
@@ -319,8 +385,17 @@ export default function AriaPage() {
               stepCount={pattern.stepCount}
               stepsPerBeat={song.stepsPerBeat}
               steps={lane.steps}
-              scale={scale}
+              scale={laneScale}
               gate={selectedTrack.gate}
+              lane={lane}
+              songKey={song.key}
+              songScaleName={song.scaleName}
+              trackInstrumentId={selectedTrack.instrumentId}
+              instrumentIds={Object.keys(song.instruments)}
+              onLaneChange={patchLane}
+              playing={laneScope !== null && isScopePlaying(laneScope)}
+              onPlay={() => { if (laneScope) void startWithScope(laneScope); }}
+              onStop={handleStop}
               onChange={patchGenerator}
               onReseed={() => setSong((c) => reseedLane(c, pattern.id, selectedTrack.id))}
               onKeep={() => setSong((c) => keepLane(c, pattern.id, selectedTrack.id))}

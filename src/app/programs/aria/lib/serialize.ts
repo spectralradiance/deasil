@@ -182,9 +182,18 @@ function parseTrack(value: unknown, fallbackInstrument: string): Track | null {
 function parseLane(value: unknown, stepCount: number): Lane {
   if (!isRecord(value)) return createLane(stepCount);
   const rawSteps = Array.isArray(value.steps) ? value.steps : [];
+  const scaleName = typeof value.scaleName === 'string' && value.scaleName in SCALE_PATTERNS
+    ? (value.scaleName as ScaleName)
+    : null;
   return {
     steps: Array.from({ length: stepCount }, (_, i) => parseStep(rawSteps[i])),
     generator: parseGenerator(value.generator, stepCount),
+    // Absent means inherit, which is also what an older save wants.
+    key: typeof value.key === 'string' && value.key.length > 0 ? value.key : null,
+    scaleName,
+    instrumentId: typeof value.instrumentId === 'string' && value.instrumentId.length > 0
+      ? value.instrumentId
+      : null,
   };
 }
 

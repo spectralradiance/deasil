@@ -2,8 +2,11 @@ import { AudioEngine } from './AudioEngine';
 import { Scheduler, type StepEvent } from './Scheduler';
 import { GraphInstrument } from './GraphInstrument';
 import { presetGraph } from './graph-presets';
-import { Scale } from '../lib/scale';
-import { findPattern, isAudible, positionAt, type Song } from '../lib/song';
+import { Scale, type ScaleName } from '../lib/scale';
+import {
+  findPattern, isAudible, laneInstrumentId, laneKey, laneScaleName, positionAt,
+  type Lane, type Song, type Track,
+} from '../lib/song';
 import { mod } from '../lib/math';
 
 /**
@@ -14,10 +17,6 @@ import { mod } from '../lib/math';
  * overwrites rather than from a closure. Editing a step, a patch, the key or
  * the mode lands on the next scheduled step without re-registering anything and
  * without interrupting playback.
- *
- * One GraphInstrument per *track*, not per patch. Two tracks sharing a patch id
- * still need separate voice pools, or a busy track would steal the other's
- * voices.
  */
 
 export interface Position {
@@ -26,17 +25,38 @@ export interface Position {
   patternId: string;
 }
 
+/**
+ * What playback covers.
+ *
+ * `song` runs the order list; `pattern` cycles one block for editing; `lane`
+ * cycles one block with a single track audible, for hearing what a generator is
+ * actually doing on its own.
+ */
+export type PlayScope =
+  | { kind: 'song' }
+  | { kind: 'pattern'; patternId: string }
+  | { kind: 'lane'; patternId: string; trackId: string };
+
+export const SONG_SCOPE: PlayScope = { kind: 'song' };
+
 export class AriaSession {
   readonly engine: AudioEngine;
   readonly scheduler: Scheduler;
 
   private song: Song | null = null;
-  private scale = new Scale('C3', 'dorian');
-  private instruments = new Map<string, GraphInstrument>();
-  private started = false;
+  private fallbackScale = new Scale('C3', 'dorian');
+  private scope: PlayScope = SONG_SCOPE;
 
-  /** When set, that pattern loops instead of the order list playing through. */
-  private loopPatternId: string | null = null;
+  /**
+   * Keyed by track *and* patch, because a lane may name its own instrument and
+   * so one channel can play different patches in different patterns. Each
+   * combination needs its own voice pool — sharing one would let a busy pattern
+   * steal voices from a patch it is not even using.
+   */
+  private instruments = new Map<string, GraphInstrument>();
+  /** Scales are immutable and cheap; building one per step would not be. */
+  private scales = new Map<string, Scale>();
+  private started = false;
 
   constructor() {
     this.engine = new AudioEngine({ masterVolume: 0.7 });
@@ -49,14 +69,22 @@ export class AriaSession {
     return this.scheduler.isPlaying;
   }
 
+  getScope(): PlayScope {
+    return this.scope;
+  }
+
+  setScope(scope: PlayScope): void {
+    this.scope = scope;
+  }
+
   /**
    * Hands the session the current song. Cheap and safe to call on every render:
-   * it only touches Web Audio when transport values or the track set change.
+   * it only touches Web Audio when transport values or the patches change.
    */
   setSong(song: Song, scale: Scale): void {
     const previous = this.song;
     this.song = song;
-    this.scale = scale;
+    this.fallbackScale = scale;
 
     if (!previous || previous.bpm !== song.bpm) this.scheduler.setBpm(song.bpm);
     if (!previous || previous.stepsPerBeat !== song.stepsPerBeat) {
@@ -65,19 +93,14 @@ export class AriaSession {
     if (this.started) this.syncInstruments();
   }
 
-  /** Loops one pattern, for editing. Pass null to follow the order list. */
-  setLoopPattern(patternId: string | null): void {
-    this.loopPatternId = patternId;
-  }
-
   /** Where the arrangement is right now, or null when stopped. */
   getPosition(): Position | null {
     const song = this.song;
     const step = this.scheduler.getPlayingStep();
     if (!song || step < 0) return null;
 
-    if (this.loopPatternId) {
-      const pattern = findPattern(song, this.loopPatternId);
+    if (this.scope.kind !== 'song') {
+      const pattern = findPattern(song, this.scope.patternId);
       if (!pattern || pattern.stepCount <= 0) return null;
       return { orderIndex: -1, row: mod(step, pattern.stepCount), patternId: pattern.id };
     }
@@ -88,7 +111,8 @@ export class AriaSession {
   }
 
   /** Must be reached from a user gesture, or the context stays suspended. */
-  async start(): Promise<void> {
+  async start(scope: PlayScope = SONG_SCOPE): Promise<void> {
+    this.scope = scope;
     await this.engine.start();
     this.started = true;
     this.syncInstruments();
@@ -130,33 +154,70 @@ export class AriaSession {
     this.scheduler.dispose();
     for (const instrument of this.instruments.values()) instrument.dispose();
     this.instruments.clear();
+    this.scales.clear();
     this.started = false;
     void this.engine.dispose();
   }
 
-  /** Creates, updates and retires one instrument per track. */
+  private instrumentKey(trackId: string, instrumentId: string): string {
+    return `${trackId}::${instrumentId}`;
+  }
+
+  /** A cached Scale for a key and mode, falling back if the key will not parse. */
+  private scaleFor(key: string, scaleName: string): Scale {
+    const id = `${key}|${scaleName}`;
+    const cached = this.scales.get(id);
+    if (cached) return cached;
+    let scale: Scale;
+    try {
+      scale = new Scale(key, scaleName as ScaleName);
+    } catch {
+      scale = this.fallbackScale;
+    }
+    this.scales.set(id, scale);
+    return scale;
+  }
+
+  /** Creates, updates and retires one instrument per track-and-patch pairing. */
   private syncInstruments(): void {
     const song = this.song;
     if (!song || !this.engine.context) return;
 
+    const live = new Set<string>();
     for (const track of song.tracks) {
-      const graph = song.instruments[track.instrumentId] ?? presetGraph('default');
-      let instrument = this.instruments.get(track.id);
-      if (!instrument) {
-        instrument = new GraphInstrument(this.engine, track.id, graph, track.polyphony);
-        this.instruments.set(track.id, instrument);
+      // Every patch this channel plays anywhere in the song, its default
+      // included, so switching patterns never has to build one mid-phrase.
+      const patchIds = new Set<string>([track.instrumentId]);
+      for (const pattern of song.patterns) {
+        patchIds.add(laneInstrumentId(track, pattern.lanes[track.id]));
       }
-      instrument.setGraph(graph);
-      instrument.setPolyphony(track.polyphony);
-      instrument.setLevel(track.level);
+
+      for (const instrumentId of patchIds) {
+        const key = this.instrumentKey(track.id, instrumentId);
+        live.add(key);
+        const graph = song.instruments[instrumentId] ?? presetGraph('default');
+        let instrument = this.instruments.get(key);
+        if (!instrument) {
+          instrument = new GraphInstrument(this.engine, key, graph, track.polyphony);
+          this.instruments.set(key, instrument);
+        }
+        instrument.setGraph(graph);
+        instrument.setPolyphony(track.polyphony);
+        instrument.setLevel(track.level);
+      }
     }
 
-    const live = new Set(song.tracks.map((t) => t.id));
-    for (const [id, instrument] of this.instruments) {
-      if (live.has(id)) continue;
+    for (const [key, instrument] of this.instruments) {
+      if (live.has(key)) continue;
       instrument.dispose();
-      this.instruments.delete(id);
+      this.instruments.delete(key);
     }
+  }
+
+  /** Whether a track sounds under the current scope, on top of mute and solo. */
+  private inScope(song: Song, track: Track): boolean {
+    if (this.scope.kind === 'lane') return track.id === this.scope.trackId;
+    return isAudible(song, track);
   }
 
   private handleStep = (event: StepEvent): void => {
@@ -167,8 +228,8 @@ export class AriaSession {
     // than in the scheduler is what lets patterns have different lengths.
     let pattern;
     let row;
-    if (this.loopPatternId) {
-      pattern = findPattern(song, this.loopPatternId);
+    if (this.scope.kind !== 'song') {
+      pattern = findPattern(song, this.scope.patternId);
       if (!pattern || pattern.stepCount <= 0) return;
       row = mod(event.step, pattern.stepCount);
     } else {
@@ -180,16 +241,23 @@ export class AriaSession {
     if (!pattern) return;
 
     for (const track of song.tracks) {
-      if (!isAudible(song, track)) continue;
-      const step = pattern.lanes[track.id]?.steps[row];
+      if (!this.inScope(song, track)) continue;
+      const lane: Lane | undefined = pattern.lanes[track.id];
+      const step = lane?.steps[row];
       if (!step) continue;
 
-      const instrument = this.instruments.get(track.id);
+      const instrument = this.instruments.get(
+        this.instrumentKey(track.id, laneInstrumentId(track, lane)),
+      );
       if (!instrument) continue;
+
+      // Each lane resolves its own key and mode, so one can sit in a different
+      // scale from the rest without touching the song's.
+      const scale = this.scaleFor(laneKey(song, lane), laneScaleName(song, lane));
 
       instrument.noteOn({
         time: event.time,
-        index: this.scale.indexAt(step.degree),
+        index: scale.indexAt(step.degree),
         holdSeconds: event.duration * track.gate,
         velocity: step.velocity ?? 0.9,
       });

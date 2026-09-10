@@ -72,10 +72,21 @@ export const DEFAULT_GENERATOR: TrackGenerator = {
   live: false,
 };
 
-/** One track's content inside one pattern. */
+/**
+ * One track's content inside one pattern.
+ *
+ * The three overrides all mean "inherit" when null: key and mode fall back to
+ * the song, the instrument to the track. Inheriting by default is what keeps
+ * the song-wide property intact — change the mode once and every lane that has
+ * not opted out re-voices with it — while still letting a single lane sit in a
+ * different mode, or play a different patch in one pattern than in another.
+ */
 export interface Lane {
   steps: StepSlot[];
   generator: TrackGenerator;
+  key: string | null;
+  scaleName: ScaleName | null;
+  instrumentId: string | null;
 }
 
 /** A channel. Global to the song, shared by every pattern. */
@@ -132,6 +143,9 @@ export function createLane(stepCount: number, overrides: Partial<Lane> = {}): La
   return {
     steps: emptySteps(stepCount),
     generator: { ...DEFAULT_GENERATOR },
+    key: null,
+    scaleName: null,
+    instrumentId: null,
     ...overrides,
   };
 }
@@ -245,6 +259,29 @@ export function scaleSizeOf(song: Song): number {
 
 export function findPattern(song: Song, patternId: string): Pattern | undefined {
   return song.patterns.find((p) => p.id === patternId);
+}
+
+/** The key a lane actually sounds in, following its override or the song. */
+export function laneKey(song: Song, lane: Lane | undefined): string {
+  return lane?.key ?? song.key;
+}
+
+/** The mode a lane actually sounds in. */
+export function laneScaleName(song: Song, lane: Lane | undefined): ScaleName {
+  return lane?.scaleName ?? song.scaleName;
+}
+
+/**
+ * The patch a lane plays through: its own if it names one, otherwise the
+ * track's. Instruments are shared freely — one may back no lanes, one, or many.
+ */
+export function laneInstrumentId(track: Track, lane: Lane | undefined): string {
+  return lane?.instrumentId ?? track.instrumentId;
+}
+
+/** Degrees per octave for a lane's mode. */
+export function laneScaleSize(song: Song, lane: Lane | undefined): number {
+  return SCALE_PATTERNS[laneScaleName(song, lane)]?.length ?? 7;
 }
 
 /**
@@ -379,7 +416,7 @@ export function addPattern(song: Song, copyFrom?: string): Song {
     for (const id of trackIds) {
       const lane = source.lanes[id];
       lanes[id] = lane
-        ? { steps: lane.steps.slice(), generator: { ...lane.generator } }
+        ? { ...lane, steps: lane.steps.slice(), generator: { ...lane.generator } }
         : createLane(source.stepCount);
     }
   }
@@ -461,7 +498,7 @@ export function regenerateLane(song: Song, patternId: string, trackId: string): 
   const pattern = findPattern(song, patternId);
   const lane = pattern?.lanes[trackId];
   if (!pattern || !lane) return song;
-  const phrase = generateTrackPhrase(lane.generator, pattern.stepCount, scaleSizeOf(song));
+  const phrase = generateTrackPhrase(lane.generator, pattern.stepCount, laneScaleSize(song, lane));
   return updateLane(song, patternId, trackId, { steps: toSteps(phrase, pattern.stepCount) });
 }
 
@@ -469,14 +506,13 @@ export function regenerateLane(song: Song, patternId: string, trackId: string): 
 export function regenerateLivePattern(song: Song, patternId: string): Song {
   const pattern = findPattern(song, patternId);
   if (!pattern) return song;
-  const size = scaleSizeOf(song);
   const lanes: Record<string, Lane> = {};
   for (const [trackId, lane] of Object.entries(pattern.lanes)) {
     lanes[trackId] = lane.generator.live
       ? {
           ...lane,
           steps: toSteps(
-            generateTrackPhrase(lane.generator, pattern.stepCount, size),
+            generateTrackPhrase(lane.generator, pattern.stepCount, laneScaleSize(song, lane)),
             pattern.stepCount,
           ),
         }

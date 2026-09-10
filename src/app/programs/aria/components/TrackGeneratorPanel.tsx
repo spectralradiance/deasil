@@ -3,7 +3,11 @@
 
 'use client';
 import React from 'react';
-import { Box, Button, Chip, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, Button, Chip, MenuItem, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
+import PianoIcon from '@mui/icons-material/Piano';
+import TuneIcon from '@mui/icons-material/Tune';
 import CasinoIcon from '@mui/icons-material/Casino';
 import LockIcon from '@mui/icons-material/Lock';
 import BoltIcon from '@mui/icons-material/Bolt';
@@ -17,8 +21,8 @@ import RotateRightIcon from '@mui/icons-material/RotateRight';
 import BlurOnIcon from '@mui/icons-material/BlurOn';
 import { Field, Row, SelectField, SliderField, ToggleField } from './ControlRow';
 import PianoRoll from './PianoRoll';
-import type { Scale } from '../lib/scale';
-import type { StepSlot, TrackGenerator } from '../lib/song';
+import { SCALE_NAMES, type Scale, type ScaleName } from '../lib/scale';
+import type { Lane, StepSlot, TrackGenerator } from '../lib/song';
 import type { PitchKind, RhythmKind } from '../lib/generate';
 import { euclideanRhythm } from '../lib/generate';
 
@@ -34,11 +38,24 @@ interface Props {
   scale: Scale;
   /** The track's gate, so note lengths in the roll match what plays. */
   gate: number;
+  /** The lane's own overrides, each null when it inherits. */
+  lane: Lane;
+  /** What it inherits when it does. */
+  songKey: string;
+  songScaleName: ScaleName;
+  trackInstrumentId: string;
+  instrumentIds: string[];
+  onLaneChange: (patch: Partial<Lane>) => void;
+  playing: boolean;
+  onPlay: () => void;
+  onStop: () => void;
   onChange: (patch: Partial<TrackGenerator>) => void;
   onReseed: () => void;
   onKeep: () => void;
   onGenerateOnce: () => void;
 }
+
+const INHERIT = '__inherit__';
 
 /** A compact read-only picture of the rhythm mask, so it can be read at a glance. */
 function RhythmPreview({ generator, stepCount, stepsPerBeat }: {
@@ -69,6 +86,8 @@ function RhythmPreview({ generator, stepCount, stepsPerBeat }: {
 
 export default function TrackGeneratorPanel({
   generator, stepCount, stepsPerBeat, steps, scale, gate,
+  lane, songKey, songScaleName, trackInstrumentId, instrumentIds, onLaneChange,
+  playing, onPlay, onStop,
   onChange, onReseed, onKeep, onGenerateOnce,
 }: Props) {
   const { live } = generator;
@@ -113,6 +132,87 @@ export default function TrackGeneratorPanel({
               </Tooltip>
             )}
           </Stack>
+        </Field>
+      </Row>
+
+      <Row>
+        <Field
+          label="preview"
+          icon={playing ? <StopIcon /> : <PlayArrowIcon />}
+          help="Loop this pattern with only this track audible, so you can hear what the generator is doing on its own."
+        >
+          {playing ? (
+            <Button size="small" variant="contained" startIcon={<StopIcon />} onClick={onStop}>
+              stop
+            </Button>
+          ) : (
+            <Button size="small" variant="contained" startIcon={<PlayArrowIcon />} onClick={onPlay}>
+              solo
+            </Button>
+          )}
+        </Field>
+
+        <Field
+          label="instrument"
+          icon={<PianoIcon />}
+          help="Which patch this lane plays through. Patches are shared, so one may back no lanes, one, or many — and a lane may use a different patch from the rest of its track."
+        >
+          <TextField
+            select
+            size="small"
+            value={lane.instrumentId ?? INHERIT}
+            onChange={(e) => onLaneChange({
+              instrumentId: e.target.value === INHERIT ? null : e.target.value,
+            })}
+            sx={{ width: 150 }}
+          >
+            <MenuItem value={INHERIT} sx={{ fontSize: 14 }}>
+              track default ({trackInstrumentId})
+            </MenuItem>
+            {instrumentIds.map((id) => (
+              <MenuItem key={id} value={id} sx={{ fontSize: 14 }}>{id}</MenuItem>
+            ))}
+          </TextField>
+        </Field>
+
+        <Field
+          label="key"
+          icon={<PianoIcon />}
+          help="The root this lane's degrees are measured from. Leave it on the song's key to move with the rest of the arrangement."
+        >
+          <TextField
+            size="small"
+            placeholder={songKey}
+            value={lane.key ?? ''}
+            onChange={(e) => onLaneChange({ key: e.target.value.trim() === '' ? null : e.target.value })}
+            sx={{ width: 110 }}
+            helperText={lane.key ? 'overriding' : `song: ${songKey}`}
+          />
+        </Field>
+
+        <Field
+          label="mode"
+          icon={<TuneIcon />}
+          help="The scale this lane's degrees are read through. Leave it inheriting and it re-voices whenever the song's mode changes."
+        >
+          <TextField
+            select
+            size="small"
+            value={lane.scaleName ?? INHERIT}
+            onChange={(e) => onLaneChange({
+              scaleName: e.target.value === INHERIT ? null : (e.target.value as ScaleName),
+            })}
+            sx={{ width: 170 }}
+          >
+            <MenuItem value={INHERIT} sx={{ fontSize: 14 }}>
+              song ({songScaleName.replace(/_/g, ' ')})
+            </MenuItem>
+            {SCALE_NAMES.map((name) => (
+              <MenuItem key={name} value={name} sx={{ fontSize: 14 }}>
+                {name.replace(/_/g, ' ')}
+              </MenuItem>
+            ))}
+          </TextField>
         </Field>
       </Row>
 
