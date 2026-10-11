@@ -5,8 +5,12 @@ import {
   InputLabel, MenuItem, Select,
 } from '@mui/material';
 import { type DivinationToken, type DrawSpread, type DrawnToken } from './ReadingEntry';
+import { createDrawRng, drawFrom } from './seeded-rng';
 
 interface Props {
+  /** Names the oracle in the draw seed, e.g. "Runes". */
+  label: string;
+  message: string;
   tokens: DivinationToken[];
   spreads: DrawSpread[];
   canReverse?: boolean;
@@ -15,19 +19,14 @@ interface Props {
   onDraw: (tokens: DrawnToken[], spread: DrawSpread) => void;
 }
 
-export default function DivinationControls({ tokens, spreads, canReverse = false, systemSelector, extraActions, onDraw }: Props) {
+export default function DivinationControls({ label, message, tokens, spreads, canReverse = false, systemSelector, extraActions, onDraw }: Props) {
   const [selectedSpread, setSelectedSpread] = useState(spreads[0]);
   const [allowReversals, setAllowReversals] = useState(false);
 
   const draw = () => {
-    const pool = [...tokens];
-    const result: DrawnToken[] = [];
-    for (let i = 0; i < selectedSpread.count; i++) {
-      if (!pool.length) break;
-      const idx = Math.floor(Math.random() * pool.length);
-      const t = pool.splice(idx, 1)[0];
-      result.push({ ...t, isReversed: canReverse && allowReversals && Math.random() < 0.5 });
-    }
+    const rng = createDrawRng(message, `${label}|${selectedSpread.name}`);
+    const result: DrawnToken[] = drawFrom(tokens, selectedSpread.count, rng, canReverse && allowReversals)
+      .map(({ item, isReversed }) => ({ ...item, isReversed }));
     onDraw(result, { ...selectedSpread });
   };
 
