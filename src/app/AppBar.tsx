@@ -60,7 +60,6 @@ export default function AppBar() {
   const menuOptions = [
     { label: 'photography',  href: '/photos'   },
     { label: 'programs',     href: '/programs' },
-    { label: 'about',        href: '/about'    },
   ];
 
   const noRipple = { '&:hover': { backgroundColor: 'transparent' }, '&:active': { backgroundColor: 'transparent' } };
