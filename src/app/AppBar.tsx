@@ -58,7 +58,6 @@ export default function AppBar() {
   };
 
   const menuOptions = [
-    { label: 'writing',      href: '/writing'  },
     { label: 'photography',  href: '/photos'   },
     { label: 'programs',     href: '/programs' },
     { label: 'about',        href: '/about'    },
