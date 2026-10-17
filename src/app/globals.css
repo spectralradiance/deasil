@@ -27,9 +27,10 @@
   background-color: #333 !important;
 }
 
-/* Brighten dark tiles so features read as lighter grey/white on black */
+/* OSM tiles are light-themed; invert them for the dark theme (hue-rotate keeps
+   water/land hues roughly natural rather than photo-negative). */
 .leaflet-tiles-dark {
-  filter: brightness(2) contrast(1.05);
+  filter: invert(1) hue-rotate(180deg) saturate(0.45) brightness(0.8) contrast(1.05);
 }
 
 :root {

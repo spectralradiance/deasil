@@ -50,9 +50,9 @@ export default function LocationPickerMap({ lat, lon, onChange }: Props) {
   const [results, setResults]     = React.useState<NominatimResult[]>([]);
   const [flyTarget, setFlyTarget] = React.useState<[number, number] | null>(null);
 
-  const tileUrl = isDark
-    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  // CARTO's basemaps now require an API key and serve a placeholder tile without one,
+  // so use OSM's standard tiles and invert them in CSS for the dark theme.
+  const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   const search = async () => {
     if (!query.trim()) return;
@@ -114,7 +114,7 @@ export default function LocationPickerMap({ lat, lon, onChange }: Props) {
         style={{ width: '100%', height: 450, borderRadius: 4 }}
       >
         <TileLayer url={tileUrl}
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           maxZoom={19} className={isDark ? 'leaflet-tiles-dark' : undefined}
         />
         <Marker position={[lat, lon]} icon={makePin(isDark ? '#90caf9' : '#1976d2')} />
