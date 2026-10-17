@@ -3,7 +3,9 @@ import { GraphInstrument } from '../audio/GraphInstrument';
 import { presetGraph } from '../audio/graph-presets';
 import { createSoftClip } from '../audio/softclip';
 import { Scale } from './scale';
-import { findPattern, isAudible, orderLength, positionAt, type Song } from './song';
+import {
+  findPattern, isAudible, laneChordOffsets, laneGate, orderLength, positionAt, type Song,
+} from './song';
 
 /**
  * Renders a song to a WAV blob with no real-time playback.
@@ -82,14 +84,21 @@ export async function renderSong(song: Song, options: BounceOptions = {}): Promi
     const time = step * secondsPerStep;
     for (const track of song.tracks) {
       if (!isAudible(song, track)) continue;
-      const slot = pattern.lanes[track.id]?.steps[position.row];
+      const lane = pattern.lanes[track.id];
+      const slot = lane?.steps[position.row];
       if (!slot) continue;
-      instruments.get(track.id)?.noteOn({
-        time,
-        index: scale.indexAt(slot.degree),
-        holdSeconds: secondsPerStep * track.gate,
-        velocity: slot.velocity ?? 0.9,
-      });
+      // The render has to voice chords exactly as the live path does, or a
+      // bounce would not be what you heard.
+      const instrument = instruments.get(track.id);
+      const holdSeconds = secondsPerStep * laneGate(track, lane);
+      for (const offset of laneChordOffsets(song, lane)) {
+        instrument?.noteOn({
+          time,
+          index: scale.indexAt(slot.degree + offset),
+          holdSeconds,
+          velocity: slot.velocity ?? 0.9,
+        });
+      }
     }
   }
 

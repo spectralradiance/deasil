@@ -2,10 +2,16 @@
 
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Box, Button, Chip, FormControlLabel, Stack, Switch, Tooltip } from '@mui/material';
+import { Box, Button, Chip, Stack, Tooltip } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
-import { Row, SliderField } from './ControlRow';
+import SpeedIcon from '@mui/icons-material/Speed';
+import StraightenIcon from '@mui/icons-material/Straighten';
+import LoopIcon from '@mui/icons-material/Loop';
+import VerticalAlignCenterIcon from '@mui/icons-material/VerticalAlignCenter';
+import GraphicEqIcon from '@mui/icons-material/GraphicEq';
+import ContentCutIcon from '@mui/icons-material/ContentCut';
+import { Row, SliderField, ToggleField } from './ControlRow';
 import type { AriaSession } from '../audio/AriaSession';
 
 interface Props {
@@ -57,6 +63,8 @@ export default function TransportBar({
 
       <SliderField
         label="tempo"
+        icon={<SpeedIcon />}
+        help="Beats per minute. One step is a sixteenth note, so a step lasts 15 / bpm seconds."
         value={bpm}
         min={40}
         max={220}
@@ -65,7 +73,9 @@ export default function TransportBar({
         onChange={onBpm}
       />
       <SliderField
-        label={`pattern ${patternName} length`}
+        label={`pattern ${patternName}`}
+        icon={<StraightenIcon />}
+        help="How many steps this pattern lasts. Growing it pads with rests; shrinking keeps what fits. Patterns may differ in length."
         value={steps}
         min={4}
         max={64}
@@ -74,29 +84,40 @@ export default function TransportBar({
         onChange={onSteps}
       />
 
-      <Tooltip title={`Cycle pattern ${patternName} instead of playing the order list through`}>
-        <FormControlLabel
-          sx={{ mb: 0.25 }}
-          control={<Switch size="small" checked={loopPattern} onChange={(e) => onLoopPattern(e.target.checked)} />}
-          label={<Box sx={{ fontSize: 13 }}>loop pattern</Box>}
-        />
-      </Tooltip>
+      <ToggleField
+        label="loop"
+        icon={<LoopIcon />}
+        help={`Off: play the arrangement, every pattern in order. On: cycle pattern ${patternName} alone, for editing it against itself.`}
+        checked={loopPattern}
+        onChange={onLoopPattern}
+      />
 
-      <Tooltip title="Keep the playing row centred. Turn it off to edit somewhere else while the loop runs.">
-        <FormControlLabel
-          sx={{ mb: 0.25 }}
-          control={<Switch size="small" checked={follow} onChange={(e) => onFollow(e.target.checked)} />}
-          label={<Box sx={{ fontSize: 13 }}>follow</Box>}
-        />
-      </Tooltip>
+      <ToggleField
+        label="follow"
+        icon={<VerticalAlignCenterIcon />}
+        help="Keep the playing row centred in the grid. Turn it off to edit somewhere else while the loop runs."
+        checked={follow}
+        onChange={onFollow}
+      />
 
       <Stack direction="row" spacing={1} sx={{ pb: 0.5 }}>
-        <Tooltip title="Voices sounding across every track, against the summed polyphony caps">
-          <Chip size="small" variant="outlined" label={`${load.active} / ${load.capacity || '—'} voices`} />
+        <Tooltip title="Notes sounding right now across every track, against the summed polyphony caps. A note holds its voice until the release finishes.">
+          <Chip
+            size="small"
+            variant="outlined"
+            icon={<GraphicEqIcon />}
+            label={`${load.active} / ${load.capacity || '—'} voices`}
+          />
         </Tooltip>
         {load.stolen > 0 && (
-          <Tooltip title="Notes that had to steal a voice. Raise a track's polyphony, or shorten its gate.">
-            <Chip size="small" variant="outlined" color="warning" label={`${load.stolen} stolen`} />
+          <Tooltip title="Notes that arrived with every voice busy and cut an older one short. Raise that track's polyphony, or shorten its gate.">
+            <Chip
+              size="small"
+              variant="outlined"
+              color="warning"
+              icon={<ContentCutIcon />}
+              label={`${load.stolen} stolen`}
+            />
           </Tooltip>
         )}
       </Stack>

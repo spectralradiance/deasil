@@ -7,6 +7,13 @@
 import { Box, Collapse, Typography } from '@mui/material';
 import { formatExactDateTime, formatDuration } from '../lib/phase-format';
 
+/** A short classification chip shown under the title while a row is expanded */
+export interface PhaseMeta {
+  label: string;
+  /** Optional color for the label; falls back to muted text */
+  color?: string;
+}
+
 export interface PhaseRowData {
   name: string;
   description: string;
@@ -18,6 +25,8 @@ export interface PhaseRowData {
   color?: string;
   /** Optional leading symbol/icon glyph */
   symbol?: string;
+  /** Optional classifications (e.g. element + modality) shown under the title when expanded */
+  meta?: PhaseMeta[];
 }
 
 interface Props {
@@ -38,31 +47,68 @@ export default function PhaseInfoPanel({ phases, selectedIdx, onSelect, activeId
         const untilMs = p.next.getTime() - now.getTime();
         const sinceMs = now.getTime() - p.last.getTime();
         return (
-          <Box key={p.name}>
+          // The open row lifts out of the list: accent border, tinted ground and
+          // its own breathing room above and below.
+          <Box
+            key={p.name}
+            sx={{
+              borderRadius: 1.5,
+              border: '1px solid',
+              borderColor: expanded ? 'primary.main' : 'transparent',
+              bgcolor: expanded ? 'action.selected' : 'transparent',
+              my: expanded ? 0.75 : 0,
+              transition: 'border-color 0.25s, background-color 0.25s, margin 0.25s',
+            }}
+          >
             <Box
               onClick={() => onSelect(i)}
               sx={{
                 display: 'flex',
                 alignItems: 'baseline',
                 gap: 1,
-                px: 0.75,
-                py: 0.35,
-                borderRadius: 1,
+                px: 1,
+                py: expanded ? 0.75 : 0.35,
+                borderRadius: 1.5,
                 cursor: 'pointer',
-                bgcolor: expanded ? 'action.selected' : 'transparent',
-                '&:hover': { bgcolor: 'action.hover' },
+                transition: 'padding 0.25s',
+                '&:hover': { bgcolor: expanded ? 'transparent' : 'action.hover' },
               }}
             >
               <Typography
-                variant="body2"
-                sx={{ color: p.color, fontWeight: i === activeIdx ? 700 : 400 }}
+                variant={expanded ? 'subtitle2' : 'body2'}
+                sx={{
+                  color: expanded ? 'primary.main' : p.color,
+                  fontWeight: expanded || i === activeIdx ? 700 : 400,
+                  letterSpacing: expanded ? '0.02em' : undefined,
+                }}
               >
                 {p.symbol ? `${p.symbol} ` : ''}{p.name}
               </Typography>
             </Box>
             <Collapse in={expanded} timeout={250} unmountOnExit>
-              <Box sx={{ px: 0.75, pt: 0.25, pb: 1 }}>
-                <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary', mb: 1 }}>
+              <Box sx={{ px: 1, pt: 0, pb: 1.25 }}>
+                {p.meta && p.meta.length > 0 && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
+                    {p.meta.map((m, k) => (
+                      <Box key={m.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        {k > 0 && <Box component="span" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>·</Box>}
+                        <Box
+                          component="span"
+                          sx={{
+                            color: m.color ?? 'text.secondary',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            letterSpacing: '0.06em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {m.label}
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+                <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary', mb: 1.25 }}>
                   {p.description}
                 </Typography>
                 <Typography variant="body2">

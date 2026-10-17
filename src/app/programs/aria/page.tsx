@@ -5,8 +5,16 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Chip, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
-import { AriaSession } from './audio/AriaSession';
+import {
+  Box, Button, Chip, Dialog, DialogContent, DialogTitle, IconButton, MenuItem, Paper,
+  Stack, TextField, Typography,
+} from '@mui/material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
+import TuneIcon from '@mui/icons-material/Tune';
+import MapIcon from '@mui/icons-material/Map';
+import CloseIcon from '@mui/icons-material/Close';
+import { AriaSession, SONG_SCOPE, type PlayScope } from './audio/AriaSession';
 import type { InstrumentGraph } from './audio/graph';
 import { GRAPH_PRESET_NAMES, presetGraph } from './audio/graph-presets';
 import { Scale, type ScaleName } from './lib/scale';
@@ -14,19 +22,21 @@ import {
   addPattern, addTrack, appendToOrder, clearLane, createSong, findPattern, keepLane,
   moveOrderSlot, regenerateLane, regenerateLiveLanes, removeOrderSlot, removePattern,
   removeTrack, reseedLane, rotateLane, setGenerator, setOrderSlot,
-  setPatternLength, setStep as setSongStep, transposeLane, updateTrack,
-  type Song, type StepSlot, type TrackGenerator,
+  laneGate, laneScaleSize, setPatternLength, setStep as setSongStep, transposeLane,
+  updateLane, updateTrack,
+  type Lane, type Song, type StepSlot, type TrackGenerator,
 } from './lib/song';
 import { loadSong, saveSong } from './lib/serialize';
 import TransportBar from './components/TransportBar';
 import TrackHeaders from './components/TrackHeaders';
 import TrackPanel from './components/TrackPanel';
-import TrackGeneratorPanel from './components/TrackGeneratorPanel';
+import MelodyPanel from './components/MelodyPanel';
 import PatternGrid, { type Cursor } from './components/PatternGrid';
 import OrderList from './components/OrderList';
 import SongPanel from './components/SongPanel';
 import SongIO from './components/SongIO';
 import Visualizers from './components/visualizers/Visualizers';
+import ResonanceField from './components/visualizers/ResonanceField';
 import GraphEditor from './components/instrument/GraphEditor';
 import NodeInspector from './components/instrument/NodeInspector';
 
@@ -56,13 +66,23 @@ export default function AriaPage() {
   const [song, setSong] = useState<Song>(createSong);
   const [playing, setPlaying] = useState(false);
   const [follow, setFollow] = useState(true);
-  const [loopPattern, setLoopPattern] = useState(true);
+  // Play means play the song: the arrangement runs through the order list.
+  // Looping one pattern, or soloing one lane, is an editing mode you opt into
+  // from that panel's own play button.
+  const [loopPattern, setLoopPattern] = useState(false);
+  const [scope, setScope] = useState<PlayScope>(SONG_SCOPE);
   const [cursor, setCursor] = useState<Cursor>({ track: 0, step: 0 });
   const [octaveOffset, setOctaveOffset] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [editingPatternId, setEditingPatternId] = useState<string | null>(null);
   const [playingIndex, setPlayingIndex] = useState(-1);
+  // Track settings are per-channel and rarely touched mid-phrase, so they sit
+  // behind a dialog rather than competing with the grid for the page.
+  const [trackOpen, setTrackOpen] = useState(false);
+  // Off by default: the minimap only earns its corner once a patch has grown
+  // past what the canvas shows at once.
+  const [showMinimap, setShowMinimap] = useState(false);
 
   // Restore the autosave after mount: localStorage is not available during the
   // server render, and reading it in an effect keeps hydration consistent.
@@ -105,29 +125,52 @@ export default function AriaPage() {
   // The one channel into the engine. Cheap on every render; it only touches Web
   // Audio when transport values or the track set actually change.
   useEffect(() => { session.setSong(song, scale); }, [session, song, scale]);
+  useEffect(() => { session.setScope(scope); }, [session, scope]);
+
+  // The transport's loop switch is just a shortcut for the pattern scope.
   useEffect(() => {
-    session.setLoopPattern(loopPattern ? pattern.id : null);
-  }, [session, loopPattern, pattern.id]);
+    setScope((current) => {
+      if (loopPattern) return { kind: 'pattern', patternId: pattern.id };
+      return current.kind === 'pattern' ? SONG_SCOPE : current;
+    });
+  }, [loopPattern, pattern.id]);
 
   // Which order slot is sounding. A readout, not a playhead, so polling a few
   // times a second is plenty and keeps the frame budget for the grid.
   useEffect(() => {
-    if (!playing || loopPattern) {
+    if (!playing || scope.kind !== 'song') {
       setPlayingIndex(-1);
       return;
     }
     const id = setInterval(() => setPlayingIndex(session.getPosition()?.orderIndex ?? -1), 120);
     return () => clearInterval(id);
-  }, [playing, loopPattern, session]);
+  }, [playing, scope, session]);
 
   const selectedIndex = Math.min(cursor.track, song.tracks.length - 1);
   const selectedTrack = song.tracks[selectedIndex];
   const lane = selectedTrack ? pattern.lanes[selectedTrack.id] : undefined;
 
-  const handlePlay = useCallback(async () => {
-    await session.start();
+  // The lane may sit in its own key or mode, so the piano roll has to name its
+  // pitches through that scale rather than the song's.
+  const laneScale = useMemo(() => {
+    const key = lane?.key ?? song.key;
+    const scaleName = lane?.scaleName ?? song.scaleName;
+    try {
+      return new Scale(key, scaleName);
+    } catch {
+      return scale;
+    }
+  }, [lane?.key, lane?.scaleName, song.key, song.scaleName, scale]);
+
+  const startWithScope = useCallback(async (next: PlayScope) => {
+    setScope(next);
+    await session.start(next);
     setPlaying(true);
   }, [session]);
+
+  const handlePlay = useCallback(() => {
+    void startWithScope(loopPattern ? { kind: 'pattern', patternId: pattern.id } : SONG_SCOPE);
+  }, [startWithScope, loopPattern, pattern.id]);
 
   const handleStop = useCallback(() => {
     session.stop();
@@ -136,10 +179,34 @@ export default function AriaPage() {
 
   const togglePlay = useCallback(() => {
     if (playing) handleStop();
-    else void handlePlay();
+    else handlePlay();
   }, [playing, handlePlay, handleStop]);
 
+  /** True when playback is running and covering exactly this scope. */
+  const isScopePlaying = useCallback((candidate: PlayScope): boolean => {
+    if (!playing || scope.kind !== candidate.kind) return false;
+    if (candidate.kind === 'song') return true;
+    if (candidate.kind === 'pattern') {
+      return scope.kind === 'pattern' && scope.patternId === candidate.patternId;
+    }
+    return scope.kind === 'lane'
+      && scope.patternId === candidate.patternId
+      && scope.trackId === candidate.trackId;
+  }, [playing, scope]);
+
+  const patternScope: PlayScope = { kind: 'pattern', patternId: pattern.id };
+  const laneScope: PlayScope | null = selectedTrack
+    ? { kind: 'lane', patternId: pattern.id, trackId: selectedTrack.id }
+    : null;
+
   const readPosition = useCallback(() => session.getPosition(), [session]);
+
+  // The roll only wants the row, and only while the pattern it shows is the one
+  // sounding — the arrangement may well be somewhere else entirely.
+  const readPatternRow = useCallback((): number => {
+    const position = session.getPosition();
+    return position && position.patternId === pattern.id ? position.row : -1;
+  }, [session, pattern.id]);
   const getAnalyser = useCallback(() => session.engine.analyser, [session]);
 
   /**
@@ -158,6 +225,11 @@ export default function AriaPage() {
     });
   }, [pattern.id]);
 
+  const patchLane = useCallback((patch: Partial<Lane>) => {
+    if (!selectedTrack) return;
+    setSong((current) => updateLane(current, pattern.id, selectedTrack.id, patch));
+  }, [selectedTrack, pattern.id]);
+
   const patchGenerator = useCallback((patch: Partial<TrackGenerator>) => {
     if (!selectedTrack) return;
     setSong((current) => setGenerator(current, pattern.id, selectedTrack.id, patch));
@@ -169,7 +241,7 @@ export default function AriaPage() {
     setSong((current) => regenerateLiveLanes({ ...current, scaleName }));
   }, []);
 
-  const instrumentId = selectedTrack?.instrumentId ?? '';
+  const instrumentId = lane?.instrumentId ?? selectedTrack?.instrumentId ?? '';
   const instrumentGraph = song.instruments[instrumentId];
   const liveCount = song.patterns.reduce(
     (total, p) => total + Object.values(p.lanes).filter((l) => l.generator.live).length, 0);
@@ -189,7 +261,7 @@ export default function AriaPage() {
   }, []);
 
   return (
-    <Box sx={{ maxWidth: 980, mx: 'auto', px: { xs: 2, sm: 3 }, py: 4 }}>
+    <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 }, py: 4 }}>
       <Typography variant="h4" sx={{ mb: 0.5 }}>Aria</Typography>
       <Typography variant="body2" sx={{ opacity: 0.65, mb: 3 }}>
         A generative tracker. Patterns are written in scale degrees and played by
@@ -198,6 +270,13 @@ export default function AriaPage() {
       </Typography>
 
       <Stack spacing={2.5}>
+        <Section title="Output">
+          <Stack spacing={2.5}>
+            <Visualizers getAnalyser={getAnalyser} playing={playing} height={96} />
+            <ResonanceField getAnalyser={getAnalyser} playing={playing} />
+          </Stack>
+        </Section>
+
         <Section title="Transport">
           <TransportBar
             session={session}
@@ -245,9 +324,37 @@ export default function AriaPage() {
         <Section
           title={`Pattern ${pattern.name}`}
           action={
-            <Typography variant="caption" sx={{ opacity: 0.55 }}>
-              octave {octaveOffset >= 0 ? `+${octaveOffset}` : octaveOffset} · [ and ] to shift
-            </Typography>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Typography variant="caption" sx={{ opacity: 0.55 }}>
+                octave {octaveOffset >= 0 ? `+${octaveOffset}` : octaveOffset} · [ and ] to shift
+              </Typography>
+              {selectedTrack && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<TuneIcon />}
+                  onClick={() => setTrackOpen(true)}
+                  title={`Settings and edit actions for ${selectedTrack.name}`}
+                >
+                  {selectedTrack.name}
+                </Button>
+              )}
+              {isScopePlaying(patternScope) ? (
+                <Button size="small" variant="contained" startIcon={<StopIcon />} onClick={handleStop}>
+                  stop
+                </Button>
+              ) : (
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={<PlayArrowIcon />}
+                  onClick={() => void startWithScope(patternScope)}
+                  title={`Loop pattern ${pattern.name} on its own`}
+                >
+                  play
+                </Button>
+              )}
+            </Stack>
           }
         >
           <TrackHeaders
@@ -285,13 +392,9 @@ export default function AriaPage() {
           </Typography>
         </Section>
 
-        <Section title="Output">
-          <Visualizers getAnalyser={getAnalyser} playing={playing} />
-        </Section>
-
         {selectedTrack && lane && (
           <Section
-            title={`Generator — ${selectedTrack.name} in ${pattern.name}`}
+            title={`Melody — ${selectedTrack.name} in ${pattern.name}`}
             action={
               liveCount > 0 ? (
                 <Chip
@@ -303,10 +406,28 @@ export default function AriaPage() {
               ) : undefined
             }
           >
-            <TrackGeneratorPanel
+            <MelodyPanel
               generator={lane.generator}
               stepCount={pattern.stepCount}
               stepsPerBeat={song.stepsPerBeat}
+              steps={lane.steps}
+              scale={laneScale}
+              gate={laneGate(selectedTrack, lane)}
+              trackGate={selectedTrack.gate}
+              polyphony={selectedTrack.polyphony}
+              scaleSize={laneScaleSize(song, lane)}
+              lane={lane}
+              songKey={song.key}
+              songScaleName={song.scaleName}
+              trackInstrumentId={selectedTrack.instrumentId}
+              instrumentIds={Object.keys(song.instruments)}
+              onLaneChange={patchLane}
+              playing={laneScope !== null && isScopePlaying(laneScope)}
+              onPlay={() => { if (laneScope) void startWithScope(laneScope); }}
+              onStop={handleStop}
+              onSetStep={(index, slot) => handleSetStep(selectedIndex, index, slot)}
+              readRow={readPatternRow}
+              patternPlaying={playing}
               onChange={patchGenerator}
               onReseed={() => setSong((c) => reseedLane(c, pattern.id, selectedTrack.id))}
               onKeep={() => setSong((c) => keepLane(c, pattern.id, selectedTrack.id))}
@@ -315,37 +436,33 @@ export default function AriaPage() {
           </Section>
         )}
 
-        {selectedTrack && (
-          <Section title={`Track — ${selectedTrack.name}`}>
-            <TrackPanel
-              song={song}
-              track={selectedTrack}
-              onPatch={(patch) => setSong((c) => updateTrack(c, selectedTrack.id, patch))}
-              onClear={() => setSong((c) => clearLane(c, pattern.id, selectedTrack.id))}
-              onRotate={(by) => setSong((c) => rotateLane(c, pattern.id, selectedTrack.id, by))}
-              onTranspose={(by) => setSong((c) => transposeLane(c, pattern.id, selectedTrack.id, by))}
-              onRemove={() => setSong((c) => removeTrack(c, selectedTrack.id))}
-              canRemove={song.tracks.length > 1}
-            />
-          </Section>
-        )}
-
         {instrumentGraph && (
           <Section
             title={`Instrument — ${instrumentId}`}
             action={
-              <TextField
-                select
-                size="small"
-                value=""
-                onChange={(e) => setInstrumentGraph(presetGraph(e.target.value))}
-                sx={{ width: 150 }}
-                slotProps={{ select: { displayEmpty: true, renderValue: () => 'load preset…' } }}
-              >
-                {GRAPH_PRESET_NAMES.map((name) => (
-                  <MenuItem key={name} value={name} sx={{ fontSize: 14 }}>{name}</MenuItem>
-                ))}
-              </TextField>
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Button
+                  size="small"
+                  variant={showMinimap ? 'contained' : 'outlined'}
+                  startIcon={<MapIcon />}
+                  onClick={() => setShowMinimap((on) => !on)}
+                  title={showMinimap ? 'Hide the graph minimap' : 'Show the graph minimap'}
+                >
+                  minimap
+                </Button>
+                <TextField
+                  select
+                  size="small"
+                  value=""
+                  onChange={(e) => setInstrumentGraph(presetGraph(e.target.value))}
+                  sx={{ width: 150 }}
+                  slotProps={{ select: { displayEmpty: true, renderValue: () => 'load preset…' } }}
+                >
+                  {GRAPH_PRESET_NAMES.map((name) => (
+                    <MenuItem key={name} value={name} sx={{ fontSize: 14 }}>{name}</MenuItem>
+                  ))}
+                </TextField>
+              </Stack>
             }
           >
             <Stack spacing={2.5}>
@@ -354,6 +471,7 @@ export default function AriaPage() {
                 onChange={setInstrumentGraph}
                 selectedNodeId={selectedNodeId}
                 onSelectNode={setSelectedNodeId}
+                showMinimap={showMinimap}
               />
               <NodeInspector
                 graph={instrumentGraph}
@@ -369,6 +487,42 @@ export default function AriaPage() {
           <SongIO song={song} onLoad={handleLoadSong} />
         </Section>
       </Stack>
+
+      {selectedTrack && (
+        <Dialog
+          open={trackOpen}
+          onClose={() => setTrackOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+            <Typography variant="overline" sx={{ opacity: 0.6, letterSpacing: '0.12em' }}>
+              {`Track — ${selectedTrack.name}`}
+            </Typography>
+            <IconButton size="small" onClick={() => setTrackOpen(false)} aria-label="close">
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ pt: 1 }}>
+            <TrackPanel
+              song={song}
+              track={selectedTrack}
+              onPatch={(patch) => setSong((c) => updateTrack(c, selectedTrack.id, patch))}
+              onClear={() => setSong((c) => clearLane(c, pattern.id, selectedTrack.id))}
+              onRotate={(by) => setSong((c) => rotateLane(c, pattern.id, selectedTrack.id, by))}
+              onTranspose={(by) => setSong((c) => transposeLane(c, pattern.id, selectedTrack.id, by))}
+              onRemove={() => {
+                // The dialog is bound to the selected track; deleting it would
+                // otherwise leave the panel editing whichever track slid into
+                // that slot.
+                setTrackOpen(false);
+                setSong((c) => removeTrack(c, selectedTrack.id));
+              }}
+              canRemove={song.tracks.length > 1}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Typography variant="caption" sx={{ display: 'block', opacity: 0.5, mt: 3 }}>
         Built to the plan in{' '}

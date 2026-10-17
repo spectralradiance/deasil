@@ -1,7 +1,9 @@
 import {
-  createLane, createSong, DEFAULT_GENERATOR, MAX_PATTERNS, MAX_STEPS, MAX_TRACKS, MIN_STEPS,
+  createLane, createSong, DEFAULT_GENERATOR, MAX_GATE, MAX_PATTERNS, MAX_STEPS, MAX_TRACKS,
+  MIN_GATE, MIN_STEPS,
   type Lane, type Pattern, type Song, type StepSlot, type Track, type TrackGenerator,
 } from './song';
+import { CHORD_NAMES, type ChordName } from './chord';
 import type { PitchKind, RhythmKind } from './generate';
 import { SCALE_PATTERNS, type ScaleName } from './scale';
 import { DEFAULT_INSTRUMENT, type InstrumentParams } from '../audio/InstrumentParams';
@@ -182,9 +184,26 @@ function parseTrack(value: unknown, fallbackInstrument: string): Track | null {
 function parseLane(value: unknown, stepCount: number): Lane {
   if (!isRecord(value)) return createLane(stepCount);
   const rawSteps = Array.isArray(value.steps) ? value.steps : [];
+  const scaleName = typeof value.scaleName === 'string' && value.scaleName in SCALE_PATTERNS
+    ? (value.scaleName as ScaleName)
+    : null;
   return {
     steps: Array.from({ length: stepCount }, (_, i) => parseStep(rawSteps[i])),
     generator: parseGenerator(value.generator, stepCount),
+    // Absent means inherit, which is also what an older save wants.
+    key: typeof value.key === 'string' && value.key.length > 0 ? value.key : null,
+    scaleName,
+    instrumentId: typeof value.instrumentId === 'string' && value.instrumentId.length > 0
+      ? value.instrumentId
+      : null,
+    // A number overrides the track's note length; anything else inherits it,
+    // which is what every save written before lanes had a gate wants.
+    gate: typeof value.gate === 'number' && Number.isFinite(value.gate)
+      ? Math.min(MAX_GATE, Math.max(MIN_GATE, value.gate))
+      : null,
+    chord: CHORD_NAMES.includes(value.chord as ChordName)
+      ? (value.chord as ChordName)
+      : 'none',
   };
 }
 

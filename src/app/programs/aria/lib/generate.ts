@@ -96,8 +96,25 @@ export function generatePhrase(options: PhraseOptions): Phrase {
 }
 
 /**
+ * Chord shapes an arpeggio may be built from, in scale degrees above the root.
+ * Reseeding an arpeggio picks between these: the figure has no randomness of
+ * its own, so without a set to choose from a new seed would have nothing to
+ * change and the reseed button would do nothing.
+ */
+export const ARPEGGIO_SHAPES: readonly (readonly number[])[] = [
+  [0, 2, 4],
+  [0, 2, 4, 6],
+  [0, 4, 2],
+  [0, 2, 4, 2],
+  [0, 3, 4],
+  [0, 2, 6],
+  [0, 4, 2, 4],
+];
+
+/**
  * An arpeggio over the degrees of a chord built on `root`, cycling through
- * `octaves` of it. Deterministic, no seed needed.
+ * `octaves` of it. Deterministic: the variation lives in which shape the
+ * caller hands it, not in here.
  */
 export function generateArpeggio(
   root: number,
@@ -232,7 +249,14 @@ export function generateTrackPhrase(
 
   let pitches: Phrase;
   if (options.pitch === 'arpeggio') {
-    pitches = generateArpeggio(options.low, length, [0, 2, 4], 2, scaleSize);
+    // Offset from the rhythm's seed so a reseed moves the figure and the
+    // groove independently, the same way it does for a walk.
+    const rng = createRng(options.seed ^ 0x51ed2701);
+    const shape = ARPEGGIO_SHAPES[Math.floor(rng() * ARPEGGIO_SHAPES.length)];
+    const octaves = 1 + Math.floor(rng() * 2);
+    // A third of the time, run the shape downwards instead.
+    const ordered = rng() < 0.34 ? [...shape].reverse() : shape;
+    pitches = generateArpeggio(options.low, length, ordered, octaves, scaleSize);
   } else if (options.pitch === 'drone') {
     pitches = new Array<number | null>(length).fill(options.low);
   } else {
@@ -246,4 +270,19 @@ export function generateTrackPhrase(
   }
 
   return Array.from({ length }, (_, i) => (mask[i] ? pitches[i] ?? null : null));
+}
+
+/**
+ * Whether the seed can change anything about this phrase.
+ *
+ * A drone is one degree repeated and a euclidean rhythm is fully determined by
+ * its pulses and rotation, so that combination has nothing for a new seed to
+ * alter. The panel disables reseed rather than offering a button that provably
+ * does nothing.
+ */
+export function seedAffectsPhrase(options: {
+  pitch: PitchKind;
+  rhythm: RhythmKind;
+}): boolean {
+  return options.pitch !== 'drone' || options.rhythm === 'random';
 }

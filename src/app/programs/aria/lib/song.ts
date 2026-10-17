@@ -1,9 +1,10 @@
 import type { InstrumentGraph } from '../audio/graph';
 import { presetGraph } from '../audio/graph-presets';
 import { SCALE_PATTERNS, type ScaleName } from './scale';
+import { chordOffsets, type ChordName } from './chord';
 import { mod } from './math';
 import {
-  generateArpeggio, generatePhrase, generateTrackPhrase, randomSeed,
+  generateTrackPhrase, randomSeed,
   type PitchKind, type RhythmKind,
 } from './generate';
 
@@ -69,13 +70,35 @@ export const DEFAULT_GENERATOR: TrackGenerator = {
   rotation: 0,
   density: 0.6,
   seed: 1,
-  live: false,
+  // On, so a new lane is a generator you play rather than an empty grid you
+  // have to fill first. Authored lanes — anything whose notes were written by
+  // hand rather than rolled — opt out explicitly, or a mode change would
+  // regenerate the very thing that was written.
+  live: true,
 };
 
-/** One track's content inside one pattern. */
+/**
+ * One track's content inside one pattern.
+ *
+ * The three overrides all mean "inherit" when null: key and mode fall back to
+ * the song, the instrument to the track. Inheriting by default is what keeps
+ * the song-wide property intact — change the mode once and every lane that has
+ * not opted out re-voices with it — while still letting a single lane sit in a
+ * different mode, or play a different patch in one pattern than in another.
+ */
 export interface Lane {
   steps: StepSlot[];
   generator: TrackGenerator;
+  key: string | null;
+  scaleName: ScaleName | null;
+  instrumentId: string | null;
+  /** Note length as a multiple of the step. Null inherits the track's gate. */
+  gate: number | null;
+  /**
+   * How many notes each written degree sounds as. Applied at schedule time
+   * from the lane's own scale, so the stored steps never change.
+   */
+  chord: ChordName;
 }
 
 /** A channel. Global to the song, shared by every pattern. */
@@ -113,6 +136,10 @@ export interface Song {
   instruments: Record<string, InstrumentGraph>;
 }
 
+/** Note length bounds, shared by the track panel, the melody panel and the parser. */
+export const MIN_GATE = 0.05;
+export const MAX_GATE = 8;
+
 export const MIN_STEPS = 4;
 export const MAX_STEPS = 64;
 export const MAX_TRACKS = 8;
@@ -132,6 +159,11 @@ export function createLane(stepCount: number, overrides: Partial<Lane> = {}): La
   return {
     steps: emptySteps(stepCount),
     generator: { ...DEFAULT_GENERATOR },
+    key: null,
+    scaleName: null,
+    instrumentId: null,
+    gate: null,
+    chord: 'none',
     ...overrides,
   };
 }
@@ -173,6 +205,21 @@ function toSteps(phrase: (number | null)[], count: number): StepSlot[] {
   });
 }
 
+/** A lane written by hand, which the generator must therefore leave alone. */
+function authoredLane(stepCount: number, phrase: (number | null)[]): Lane {
+  return createLane(stepCount, {
+    steps: toSteps(phrase, stepCount),
+    generator: { ...DEFAULT_GENERATOR, live: false },
+  });
+}
+
+/** A lane that is its generator settings: the steps are rolled, not written. */
+function liveLane(stepCount: number, generator: Partial<TrackGenerator>): Lane {
+  return createLane(stepCount, {
+    generator: { ...DEFAULT_GENERATOR, ...generator, live: true },
+  });
+}
+
 /**
  * A starting song: four channels, two patterns, already playing something.
  *
@@ -180,6 +227,13 @@ function toSteps(phrase: (number | null)[], count: number): StepSlot[] {
  * broken rather than blank. Everything here is deterministic, so the opening
  * bars are the same for everyone. The second pattern is a variation, so the
  * order list has something real to sequence.
+ *
+ * The lead and the pluck are **live**: they hold generator settings rather than
+ * notes, so the first thing the generator panel offers is a working set of
+ * controls over something already sounding. The bass and the pad are
+ * **authored** — a two-note ostinato is not a thing a generator setting
+ * expresses, and re-rolling it on every mode change would be a loss rather
+ * than a variation.
  */
 export function createSong(): Song {
   const stepCount = 16;
@@ -192,34 +246,36 @@ export function createSong(): Song {
   const [lead, bass, pluck, pad] = tracks.map((t) => t.id);
   const trackIds = tracks.map((t) => t.id);
 
-  const leadA = generatePhrase({
-    length: stepCount, low: -2, high: 7, restDensity: 0.3, stepwise: 0.8, seed: 20260909,
-  });
-  const leadB = generatePhrase({
-    length: stepCount, low: 0, high: 9, restDensity: 0.35, stepwise: 0.6, seed: 4242,
-  });
   const bassA = Array.from({ length: stepCount }, (_, i) =>
     (i % 4 === 0 ? (i === 12 ? -3 : -7) : null));
   const bassB = Array.from({ length: stepCount }, (_, i) =>
     (i % 4 === 0 ? (i === 8 ? -5 : -7) : null));
-  const pluckLine = generateArpeggio(0, stepCount, [0, 2, 4], 2, 7)
-    .map((degree, i) => (i % 2 === 1 ? degree : null));
   const padLine = Array.from({ length: stepCount }, (_, i) => (i === 0 ? 0 : i === 8 ? 3 : null));
 
   const patternA = createPattern('A', stepCount, trackIds, {
-    [lead]: createLane(stepCount, { steps: toSteps(leadA, stepCount) }),
-    [bass]: createLane(stepCount, { steps: toSteps(bassA, stepCount) }),
-    [pluck]: createLane(stepCount, { steps: toSteps(pluckLine, stepCount) }),
-    [pad]: createLane(stepCount, { steps: toSteps(padLine, stepCount) }),
+    [lead]: liveLane(stepCount, {
+      pitch: 'walk', rhythm: 'euclidean', pulses: 11, low: -2, high: 7, stepwise: 0.8, seed: 20260909,
+    }),
+    [bass]: authoredLane(stepCount, bassA),
+    [pluck]: liveLane(stepCount, {
+      pitch: 'arpeggio', rhythm: 'euclidean', pulses: 8, rotation: 1, low: 0, high: 7, seed: 1337,
+    }),
+    [pad]: authoredLane(stepCount, padLine),
   });
   const patternB = createPattern('B', stepCount, trackIds, {
-    [lead]: createLane(stepCount, { steps: toSteps(leadB, stepCount) }),
-    [bass]: createLane(stepCount, { steps: toSteps(bassB, stepCount) }),
-    [pluck]: createLane(stepCount, { steps: toSteps(pluckLine, stepCount) }),
-    [pad]: createLane(stepCount, { steps: toSteps(padLine, stepCount) }),
+    [lead]: liveLane(stepCount, {
+      pitch: 'walk', rhythm: 'euclidean', pulses: 9, rotation: 2, low: 0, high: 9, stepwise: 0.6, seed: 4242,
+    }),
+    [bass]: authoredLane(stepCount, bassB),
+    [pluck]: liveLane(stepCount, {
+      pitch: 'arpeggio', rhythm: 'euclidean', pulses: 8, rotation: 1, low: 0, high: 7, seed: 1337,
+    }),
+    [pad]: authoredLane(stepCount, padLine),
   });
 
-  return {
+  // The live lanes hold settings and no notes until this runs; without it the
+  // opening grid would be half empty.
+  return regenerateLiveLanes({
     bpm: 110,
     stepsPerBeat: 4,
     key: 'C3',
@@ -233,7 +289,7 @@ export function createSong(): Song {
       pluck: presetGraph('pluck'),
       pad: presetGraph('pad'),
     },
-  };
+  });
 }
 
 // ---- lookups ----------------------------------------------------------------
@@ -245,6 +301,43 @@ export function scaleSizeOf(song: Song): number {
 
 export function findPattern(song: Song, patternId: string): Pattern | undefined {
   return song.patterns.find((p) => p.id === patternId);
+}
+
+/** The key a lane actually sounds in, following its override or the song. */
+export function laneKey(song: Song, lane: Lane | undefined): string {
+  return lane?.key ?? song.key;
+}
+
+/** The mode a lane actually sounds in. */
+export function laneScaleName(song: Song, lane: Lane | undefined): ScaleName {
+  return lane?.scaleName ?? song.scaleName;
+}
+
+/**
+ * The patch a lane plays through: its own if it names one, otherwise the
+ * track's. Instruments are shared freely — one may back no lanes, one, or many.
+ */
+export function laneInstrumentId(track: Track, lane: Lane | undefined): string {
+  return lane?.instrumentId ?? track.instrumentId;
+}
+
+/** Degrees per octave for a lane's mode. */
+export function laneScaleSize(song: Song, lane: Lane | undefined): number {
+  return SCALE_PATTERNS[laneScaleName(song, lane)]?.length ?? 7;
+}
+
+/** The note length a lane actually plays at: its own, or the track's. */
+export function laneGate(track: Track, lane: Lane | undefined): number {
+  const own = lane?.gate;
+  return typeof own === 'number' && Number.isFinite(own) ? own : track.gate;
+}
+
+/**
+ * The degree offsets one step of this lane sounds as. `[0]` for a plain lane,
+ * so the caller can loop unconditionally.
+ */
+export function laneChordOffsets(song: Song, lane: Lane | undefined): readonly number[] {
+  return chordOffsets(lane?.chord ?? 'none', laneScaleSize(song, lane));
 }
 
 /**
@@ -379,7 +472,7 @@ export function addPattern(song: Song, copyFrom?: string): Song {
     for (const id of trackIds) {
       const lane = source.lanes[id];
       lanes[id] = lane
-        ? { steps: lane.steps.slice(), generator: { ...lane.generator } }
+        ? { ...lane, steps: lane.steps.slice(), generator: { ...lane.generator } }
         : createLane(source.stepCount);
     }
   }
@@ -430,15 +523,29 @@ export function addTrack(song: Song): Song {
   if (song.tracks.length >= MAX_TRACKS) return song;
   const instrumentId = Object.keys(song.instruments)[0] ?? 'lead';
   const track = createTrack(`track ${song.tracks.length + 1}`, instrumentId);
-  return {
+  const withTrack: Song = {
     ...song,
     tracks: [...song.tracks, track],
-    // Every pattern gains an empty lane, so the new channel exists everywhere.
+    // Every pattern gains a lane, so the new channel exists everywhere.
     patterns: song.patterns.map((p) => ({
       ...p,
-      lanes: { ...p.lanes, [track.id]: createLane(p.stepCount) },
+      lanes: {
+        ...p.lanes,
+        // Seeded per track, so two new channels do not come up in unison.
+        [track.id]: createLane(p.stepCount, {
+          generator: { ...DEFAULT_GENERATOR, seed: randomSeed() },
+        }),
+      },
     })),
   };
+  // A lane that says it is live should hold the roll it is claiming, not an
+  // empty grid waiting for the first slider move.
+  return withTrack.patterns.reduce(
+    (current, p) => (current.patterns.find((q) => q.id === p.id)?.lanes[track.id]?.generator.live
+      ? regenerateLane(current, p.id, track.id)
+      : current),
+    withTrack,
+  );
 }
 
 export function removeTrack(song: Song, trackId: string): Song {
@@ -461,7 +568,7 @@ export function regenerateLane(song: Song, patternId: string, trackId: string): 
   const pattern = findPattern(song, patternId);
   const lane = pattern?.lanes[trackId];
   if (!pattern || !lane) return song;
-  const phrase = generateTrackPhrase(lane.generator, pattern.stepCount, scaleSizeOf(song));
+  const phrase = generateTrackPhrase(lane.generator, pattern.stepCount, laneScaleSize(song, lane));
   return updateLane(song, patternId, trackId, { steps: toSteps(phrase, pattern.stepCount) });
 }
 
@@ -469,14 +576,13 @@ export function regenerateLane(song: Song, patternId: string, trackId: string): 
 export function regenerateLivePattern(song: Song, patternId: string): Song {
   const pattern = findPattern(song, patternId);
   if (!pattern) return song;
-  const size = scaleSizeOf(song);
   const lanes: Record<string, Lane> = {};
   for (const [trackId, lane] of Object.entries(pattern.lanes)) {
     lanes[trackId] = lane.generator.live
       ? {
           ...lane,
           steps: toSteps(
-            generateTrackPhrase(lane.generator, pattern.stepCount, size),
+            generateTrackPhrase(lane.generator, pattern.stepCount, laneScaleSize(song, lane)),
             pattern.stepCount,
           ),
         }
@@ -510,8 +616,18 @@ export function setGenerator(
     : next;
 }
 
+/**
+ * Rolls a new seed and writes the phrase it produces.
+ *
+ * The regenerate is not optional. `setGenerator` only re-derives a *live*
+ * lane, so reseeding a kept lane used to change the number and leave the notes
+ * exactly as they were — a button that visibly did nothing until you happened
+ * to turn live on. Reseed means "different notes", which is a thing worth
+ * asking for whether or not the lane is still generating.
+ */
 export function reseedLane(song: Song, patternId: string, trackId: string): Song {
-  return setGenerator(song, patternId, trackId, { seed: randomSeed() });
+  const next = setGenerator(song, patternId, trackId, { seed: randomSeed() });
+  return regenerateLane(next, patternId, trackId);
 }
 
 /**

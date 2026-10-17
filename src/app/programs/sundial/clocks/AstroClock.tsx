@@ -1,18 +1,25 @@
 // ============================================================
 // AstroClock.tsx — Astrological zodiac clock using RadialClock
 //
-// The ring is divided into 12 zodiac sign segments with an
-// elemental color gradient. The main hand marks the Sun.
-// Each planet (Moon through Neptune) has its own shorter hand.
-// Sign symbols inside the ring are clickable.
-// Positions use simplified mean orbital elements (±5° accuracy).
+// The ring is divided into 12 zodiac sign segments colored by
+// element, running counter-clockwise from 0° Aries at the top as
+// an astrological chart does. Outside it, a calendar collar marks
+// where the civil months fall against the same ecliptic.
+//
+// Two renderings of the same positions are available:
+//   • 'wheel' — every body on one band, staggered radially,
+//     with a web of chords for the major aspects.
+//   • 'rings' — each body on its own concentric orbit ring,
+//     in classical geocentric order with the Earth at center.
+//
+// Positions are geocentric tropical longitudes from lib/astro.
 // ============================================================
 'use client';
 
-import React from 'react';
-import { Box } from '@mui/material';
+import React, { useMemo } from 'react';
+import { Box, useTheme } from '@mui/material';
 import RadialClock, { ColorStop } from './RadialClock';
-import { calcPlanetLongitudes, calcAspects } from '../lib/astro';
+import { calcPlanetLongitudes, calcAspects, calcRetrogrades, CHART_BODIES } from '../lib/astro';
 
 // ---- Zodiac sign data with descriptions ---------------------
 
@@ -33,55 +40,82 @@ export const ZODIAC_DATA: ZodiacInfo[] = [
   { name: 'Pisces',       symbol: '♓︎', description: 'Compassionate, dreamy, and spiritual. Season of endings and transcendence.' },
 ];
 
-// ---- Zodiac colors — richer per-sign palette, still element-grouped ----
-// Paired stops (start + end-ε) produce solid bands with sharp boundaries.
-const FIRE  = '#D94040';
-const EARTH = '#4A7A30';
-const AIR   = '#C8A820';
-const WATER = '#2050A8';
-// Individual sign colors within each element family
-const SIGN_COLORS = [
-  '#D94040', // Aries        — cardinal fire
-  '#3D8A3A', // Taurus       — fixed earth
-  '#C8B020', // Gemini       — mutable air
-  '#2060B8', // Cancer       — cardinal water
-  '#E06820', // Leo          — fixed fire
-  '#5A9040', // Virgo        — mutable earth
-  '#90C830', // Libra        — cardinal air
-  '#3A2F8A', // Scorpio      — fixed water
-  '#C02828', // Sagittarius  — mutable fire
-  '#8A5A18', // Capricorn    — cardinal earth
-  '#30A8C8', // Aquarius     — fixed air
-  '#6030A0', // Pisces       — mutable water
-];
-const ZODIAC_COLORS: ColorStop[] = SIGN_COLORS.flatMap((color, i) => [
-  { pos: i / 12,                hex: color },
-  { pos: (i + 1) / 12 - 0.001, hex: color },
-]);
+// ---- Zodiac colors — one hue per element, repeating three times ----
+//
+// The band is the scale, not the data: the planet glyphs sit on top of it and
+// have to stay the loudest thing on the dial. So it carries four colors, not
+// twelve — elements cycle Fire → Earth → Air → Water around the whole wheel,
+// and sign identity comes from the glyphs and ticks rather than from a hue of
+// its own.
+//
+// Each theme has its own steps of the same four hues. Both sets clear the
+// lightness band, chroma floor, CVD separation, normal-vision floor and
+// contrast gates on every pair, in both themes.
+//
+// Fire and Earth are the delicate pair: they are adjacent on the wheel
+// (Aries -> Taurus) and red/green is exactly what protan and deutan vision
+// collapse — and the redder Fire gets, the darker it simulates, closing the
+// gap further. They are held apart by LIGHTNESS, and Earth sits at a green
+// leaning slightly toward emerald rather than grass; that hue is what buys
+// the separation back. Shifting Earth much below ~150 deg or Fire much below
+// ~36 deg drops the pair under the CVD threshold, so re-validate if either
+// moves.
+export const ELEMENTS = ['Fire', 'Earth', 'Air', 'Water'] as const;
+export type Element = typeof ELEMENTS[number];
 
-// ---- Planet orbit ring data --------------------------------
-// Planets ordered from fastest (Moon, inner ring) to slowest (Neptune, outer).
-// orbitR: SVG radius of the orbit ring, evenly spaced inward from the zodiac ring.
-const PLANET_RINGS: { key: string; symbol: string; color: string; orbitR: number }[] = [
-  { key: 'Moon',    symbol: '\u263D\uFE0E', color: '#C0C0C0', orbitR: 16 },
-  { key: 'Mercury', symbol: '\u263F\uFE0E', color: '#B8860B', orbitR: 26 },
-  { key: 'Venus',   symbol: '\u2640\uFE0E', color: '#FFB6C1', orbitR: 36 },
-  { key: 'Mars',    symbol: '\u2642\uFE0E', color: '#FF6644', orbitR: 46 },
-  { key: 'Jupiter', symbol: '\u2643\uFE0E', color: '#FFA500', orbitR: 56 },
-  { key: 'Saturn',  symbol: '\u2644\uFE0E', color: '#C09060', orbitR: 66 },
-  { key: 'Uranus',  symbol: '\u2645\uFE0E', color: '#40E0D0', orbitR: 76 },
-  { key: 'Neptune', symbol: '\u2646\uFE0E', color: '#6495ED', orbitR: 86 },
-];
+const ELEMENT_PALETTE: Record<'light' | 'dark', Record<Element, string>> = {
+  light: { Fire: '#dc4d04', Earth: '#028758', Air: '#8d77c0', Water: '#1063ae' },
+  dark:  { Fire: '#ea5b1e', Earth: '#009561', Air: '#9a86cc', Water: '#266fb8' },
+};
+
+/** Element of sign `i` — they cycle in step with the wheel */
+export const signElement = (i: number): Element => ELEMENTS[i % 4];
+
+export const MODALITIES = ['Cardinal', 'Fixed', 'Mutable'] as const;
+export type Modality = typeof MODALITIES[number];
+
+/** Modality of sign i — the three cycle alongside the four elements, so every
+ *  sign lands on a unique element/modality pair over the twelve. */
+export const signModality = (i: number): Modality => MODALITIES[i % 3];
+
+/** The element colors for the active theme */
+export function useElementColors(): Record<Element, string> {
+  return ELEMENT_PALETTE[useDark() ? 'dark' : 'light'];
+}
+
+/** The 12 band colors for a theme (four element hues, each used three times) */
+function signColors(mode: 'light' | 'dark'): string[] {
+  const pal = ELEMENT_PALETTE[mode];
+  return Array.from({ length: 12 }, (_, i) => pal[signElement(i)]);
+}
+
+/** Paired stops (start + end-ε) produce solid bands with sharp boundaries */
+function zodiacStops(colors: string[]): ColorStop[] {
+  return colors.flatMap((color, i) => [
+    { pos: i / 12,               hex: color },
+    { pos: (i + 1) / 12 - 0.001, hex: color },
+  ]);
+}
 
 // ---- Planet symbol & color maps ----------------------------
 const PLANET_SYMBOLS: Record<string, string> = {
   Sun: '☉︎', Moon: '☽︎', Mercury: '☿︎', Venus: '♀︎', Mars: '♂︎',
   Jupiter: '♃︎', Saturn: '♄︎', Uranus: '♅︎', Neptune: '♆︎',
 };
-const PLANET_COLORS: Record<string, string> = {
-  Sun: '#FFD700', Moon: '#C0C0C0', Mercury: '#B8860B', Venus: '#FFB6C1',
-  Mars: '#FF6644', Jupiter: '#FFA500', Saturn: '#C09060', Uranus: '#40E0D0', Neptune: '#6495ED',
+// The planets are the data layer and have to stay the loudest thing on the
+// dial, so they get their own steps per theme — the traditional dark-background
+// metals wash out completely on white.
+const PLANET_PALETTE: Record<'light' | 'dark', Record<string, string>> = {
+  dark: {
+    Sun: '#FFD700', Moon: '#C0C0C0', Mercury: '#B8860B', Venus: '#FFB6C1',
+    Mars: '#FF6644', Jupiter: '#FFA500', Saturn: '#C09060', Uranus: '#40E0D0', Neptune: '#6495ED',
+  },
+  light: {
+    Sun: '#A67C00', Moon: '#6E6E6E', Mercury: '#7A5C08', Venus: '#B0436A',
+    Mars: '#C6341A', Jupiter: '#B26B00', Saturn: '#7A5A34', Uranus: '#0E8C80', Neptune: '#2B5FBF',
+  },
 };
+const RETROGRADE_SYMBOL = '℞';
 
 // ---- Shared layout constants --------------------------------
 const SIZE         = 280;
@@ -91,14 +125,73 @@ const RING_RADIUS  = 100;
 const RING_WIDTH   = 12;
 const SUN_HAND_R   = RING_RADIUS - RING_WIDTH / 2 - 2;  // = 92
 const START_ANGLE  = -Math.PI / 2;
-const ICON_OFFSET  = 30;
-const ICON_R       = RING_RADIUS + RING_WIDTH / 2 + ICON_OFFSET; // = 136
+const ICON_OFFSET  = 34;
+const ICON_R       = RING_RADIUS + RING_WIDTH / 2 + ICON_OFFSET; // = 140
+
+// Calendar collar: a thin neutral band outside the zodiac ring
+const MONTH_R       = 114;
+const MONTH_WIDTH   = 8;
+const MONTH_INNER_R = MONTH_R - MONTH_WIDTH / 2;
+const MONTH_OUTER_R = MONTH_R + MONTH_WIDTH / 2;
+const TAU           = Math.PI * 2;
+
+// Standard chart wheels run counter-clockwise: Aries → Taurus → Gemini …
+const CHART_DIRECTION: -1 = -1;
+
+/** Ecliptic longitude (degrees) → SVG angle (radians) on the chart face */
+function lonToAngle(lon: number): number {
+  return CHART_DIRECTION * (lon / 360) * 2 * Math.PI + START_ANGLE;
+}
+
+// Ring ticks every 10°, with the 12 sign boundaries drawn long
+const RING_TICKS       = 36;
+const SIGN_BOUNDARIES  = Array.from({ length: 12 }, (_, i) => i * 3);
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/** Where each civil month starts and ends on the ecliptic, for a given year.
+ *  Months are measured, not assumed: because the Sun enters a sign around the
+ *  20th, a month boundary lands roughly a third of the way into a sign, and
+ *  that offset is the interesting part.
+ */
+function monthArcs(year: number): { name: string; startLon: number; endLon: number }[] {
+  return MONTH_NAMES.map((name, m) => ({
+    name,
+    startLon: calcPlanetLongitudes(new Date(year, m, 1)).Sun,
+    endLon:   calcPlanetLongitudes(new Date(year, m + 1, 1)).Sun,
+  }));
+}
+
+/** Filled annulus segment between two angles, counter-clockwise */
+function bandPath(rIn: number, rOut: number, a0: number, a1: number): string {
+  const span = TAU - (((a1 - a0) % TAU) + TAU) % TAU;
+  const large = span > Math.PI ? 1 : 0;
+  return [
+    `M ${CX + rIn  * Math.cos(a0)} ${CY + rIn  * Math.sin(a0)}`,
+    `A ${rIn} ${rIn} 0 ${large} 0 ${CX + rIn  * Math.cos(a1)} ${CY + rIn  * Math.sin(a1)}`,
+    `L ${CX + rOut * Math.cos(a1)} ${CY + rOut * Math.sin(a1)}`,
+    `A ${rOut} ${rOut} 0 ${large} 1 ${CX + rOut * Math.cos(a0)} ${CY + rOut * Math.sin(a0)}`,
+    'Z',
+  ].join(' ');
+}
 
 // Aspect chord visual properties
-const ASPECT_COLOR: Record<string, string> = {
-  Conjunction: '#AAAAAA', Sextile: '#1976D2', Square: '#D32F2F',
-  Trine: '#388E3C', Opposition: '#D32F2F',
+const ASPECT_PALETTE: Record<'light' | 'dark', Record<string, string>> = {
+  dark: {
+    Conjunction: '#9C9C9C', Sextile: '#4A8FC0', Square: '#C25F52',
+    Trine: '#5F9A6C', Opposition: '#C25F52',
+  },
+  light: {
+    Conjunction: '#6E6E6E', Sextile: '#2F6FA0', Square: '#A8402F',
+    Trine: '#3E7A4C', Opposition: '#A8402F',
+  },
 };
+
+/** Whether the app is on its dark theme — used for every step below */
+function useDark(): boolean {
+  const theme = useTheme();
+  return theme.palette.mode === 'dark';
+}
 const ASPECT_MAX_ORB: Record<string, number> = {
   Conjunction: 8, Sextile: 6, Square: 8, Trine: 8, Opposition: 8,
 };
@@ -109,28 +202,36 @@ const WEB_R        = 88;
 const RING_INNER_R = RING_RADIUS - RING_WIDTH / 2; // 94
 function trackRadius(track: number) { return 74 + track * 12; }
 
+// Concentric-rings view: one orbit ring per body, innermost sphere first
+const ORBIT_INNER_R = 20;
+const ORBIT_OUTER_R = 86;
+const ORBIT_STEP    = (ORBIT_OUTER_R - ORBIT_INNER_R) / (CHART_BODIES.length - 1);
+function orbitRadius(index: number) { return ORBIT_INNER_R + index * ORBIT_STEP; }
+
+export type AstroView = 'wheel' | 'rings';
+
 // ---- Zodiac symbols (interactive, rendered as children) -----
-// Sign symbols sit OUTSIDE the ring at each sign's start angle,
-// aligned with the major tick marks. The active sign (Sun's current
-// sign) gets a highlight ring; all others are shown at reduced opacity.
+// Sign symbols sit OUTSIDE the ring at each sign's center angle.
+// The active sign (Sun's current sign) gets a highlight ring.
 
 interface ZodiacSymbolsProps {
   activeIndex: number;
+  colors: string[];
   onSignClick?: (index: number) => void;
 }
 
-const ZodiacSymbols: React.FC<ZodiacSymbolsProps> = ({ activeIndex, onSignClick }) => {
-  // Connector line: from just outside the ring outer edge to just before the symbol
-  const lineStart = RING_RADIUS + RING_WIDTH / 2;
-  const lineEnd   = RING_RADIUS + RING_WIDTH;
+const ZodiacSymbols: React.FC<ZodiacSymbolsProps> = ({ activeIndex, colors, onSignClick }) => {
+  // Connector line: from outside the calendar collar to just before the symbol
+  const lineStart = MONTH_OUTER_R + 2;
+  const lineEnd   = MONTH_OUTER_R + 8;
   return (
     <>
       {ZODIAC_DATA.map((sign, i) => {
         // Position at CENTER of each sign's arc band
-        const a        = ((i + 0.5) / 12) * 2 * Math.PI + START_ANGLE;
+        const a        = lonToAngle((i + 0.5) * 30);
         const x        = CX + ICON_R * Math.cos(a);
         const y        = CY + ICON_R * Math.sin(a);
-        const color    = SIGN_COLORS[i];
+        const color    = colors[i];
         const isActive = i === activeIndex;
         return (
           <g
@@ -171,6 +272,60 @@ const ZodiacSymbols: React.FC<ZodiacSymbolsProps> = ({ activeIndex, onSignClick 
   );
 };
 
+// ---- MonthCollar — civil calendar against the same ecliptic --
+// Deliberately neutral: the elements own the color on this dial, and the
+// calendar is a reference scale sitting beside them, not another category.
+const MonthCollar: React.FC<{ year: number }> = ({ year }) => {
+  const months = useMemo(() => monthArcs(year), [year]);
+  return (
+    <g>
+      {months.map((mo, i) => {
+        const a0  = lonToAngle(mo.startLon);
+        const a1  = lonToAngle(mo.endLon);
+        // Midpoint of the arc, stepping the short way round
+        const mid = lonToAngle(mo.startLon + ((((mo.endLon - mo.startLon) % 360) + 360) % 360) / 2);
+        return (
+          <g key={mo.name}>
+            <path
+              d={bandPath(MONTH_INNER_R, MONTH_OUTER_R, a0, a1)}
+              fill="currentColor"
+              opacity={i % 2 === 0 ? 0.05 : 0.018}
+            />
+            {/* Boundary tick at the start of the month */}
+            <line
+              x1={CX + MONTH_INNER_R * Math.cos(a0)} y1={CY + MONTH_INNER_R * Math.sin(a0)}
+              x2={CX + MONTH_OUTER_R * Math.cos(a0)} y2={CY + MONTH_OUTER_R * Math.sin(a0)}
+              stroke="currentColor" strokeWidth={0.5} opacity={0.22}
+            />
+            {/* Upright label — never rotated, so nothing reads upside down */}
+            <text
+              x={CX + MONTH_R * Math.cos(mid)} y={CY + MONTH_R * Math.sin(mid)}
+              textAnchor="middle" dominantBaseline="central"
+              fontSize="6.5" fill="currentColor" opacity={0.72}
+            >
+              {mo.name}
+            </text>
+          </g>
+        );
+      })}
+      <circle cx={CX} cy={CY} r={MONTH_OUTER_R} fill="none"
+        stroke="currentColor" strokeWidth={0.4} opacity={0.1} />
+    </g>
+  );
+};
+
+// ---- Shared defs -------------------------------------------
+// A halo in the page's own background colour keeps planet glyphs legible where
+// they cross aspect lines and orbit rings.
+const GlyphShadow: React.FC<{ id: string; dark: boolean }> = ({ id, dark }) => (
+  <defs>
+    <filter id={id} x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="1.8"
+        floodColor={dark ? '#000000' : '#ffffff'} floodOpacity={dark ? 0.85 : 0.95} />
+    </filter>
+  </defs>
+);
+
 // ---- Track assignment — greedy radial staggering -----------
 function assignTracks(lons: Record<string, number>): Map<string, number> {
   const sorted = Object.entries(lons)
@@ -200,7 +355,7 @@ function assignTracks(lons: Record<string, number>): Map<string, number> {
 }
 
 // ---- AspectWeb — major aspect chord lines in center ---------
-const AspectWeb: React.FC<{ lons: Record<string, number> }> = ({ lons }) => {
+const AspectWeb: React.FC<{ lons: Record<string, number>; colors: Record<string, string> }> = ({ lons, colors }) => {
   const aspects = calcAspects(lons);
   return (
     <>
@@ -214,9 +369,9 @@ const AspectWeb: React.FC<{ lons: Record<string, number> }> = ({ lons }) => {
         fill="none" stroke="currentColor" strokeWidth={0.3} opacity={0.15} />
       <g clipPath="url(#aspect-clip)">
         {aspects.map(asp => {
-          const a1 = (lons[asp.body1] / 360) * 2 * Math.PI + START_ANGLE;
-          const a2 = (lons[asp.body2] / 360) * 2 * Math.PI + START_ANGLE;
-          const color   = ASPECT_COLOR[asp.type];
+          const a1 = lonToAngle(lons[asp.body1]);
+          const a2 = lonToAngle(lons[asp.body2]);
+          const color   = colors[asp.type];
           const maxOrb  = ASPECT_MAX_ORB[asp.type];
           const tight   = 1 - asp.orb / maxOrb;
           const opacity = 0.25 + tight * 0.75;
@@ -236,25 +391,24 @@ const AspectWeb: React.FC<{ lons: Record<string, number> }> = ({ lons }) => {
 };
 
 // ---- PlanetGlyphs — staggered symbols with degree ticks -----
-const PlanetGlyphs: React.FC<{ lons: Record<string, number> }> = ({ lons }) => {
+const PlanetGlyphs: React.FC<{
+  lons: Record<string, number>;
+  planetColors: Record<string, string>;
+  dark: boolean;
+}> = ({ lons, planetColors, dark }) => {
   const tracks = assignTracks(lons);
   return (
     <>
-      <defs>
-        {/* Dark dropshadow keeps planet glyphs legible over aspect lines */}
-        <filter id="planet-shadow" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="0" stdDeviation="1.8" floodColor="#000000" floodOpacity="0.85" />
-        </filter>
-      </defs>
+      <GlyphShadow id="planet-shadow" dark={dark} />
       {Object.entries(lons)
         .filter(([k]) => k !== 'Sun')
         .map(([name, lon]) => {
           const track  = tracks.get(name) ?? 0;
           const r      = trackRadius(track);
-          const a      = (lon / 360) * 2 * Math.PI + START_ANGLE;
+          const a      = lonToAngle(lon);
           const gx     = CX + r * Math.cos(a);
           const gy     = CY + r * Math.sin(a);
-          const color  = PLANET_COLORS[name] ?? '#FFFFFF';
+          const color  = planetColors[name] ?? 'currentColor';
           const tickX1 = CX + (RING_INNER_R - 6) * Math.cos(a);
           const tickY1 = CY + (RING_INNER_R - 6) * Math.sin(a);
           const tickX2 = CX + (RING_INNER_R - 1) * Math.cos(a);
@@ -280,32 +434,123 @@ const PlanetGlyphs: React.FC<{ lons: Record<string, number> }> = ({ lons }) => {
   );
 };
 
+// ---- OrbitRings — one concentric ring per body --------------
+// Bodies run outward in classical geocentric order (Moon → Neptune) around an
+// Earth at the center. A retrograde body's ring is drawn dashed. Each glyph
+// carries a leader out to the zodiac band so its sign and degree stay readable.
+const OrbitRings: React.FC<{
+  lons: Record<string, number>;
+  retrogrades: Record<string, boolean>;
+  colors: string[];
+  planetColors: Record<string, string>;
+  dark: boolean;
+}> = ({ lons, retrogrades, colors, planetColors, dark }) => (
+  <>
+    <GlyphShadow id="orbit-shadow" dark={dark} />
+
+    {/* Sign-boundary spokes, so a body's sign can be read straight off its ring */}
+    {ZODIAC_DATA.map((_, i) => {
+      const a = lonToAngle(i * 30);
+      return (
+        <line
+          key={`spoke-${i}`}
+          x1={CX + 11 * Math.cos(a)} y1={CY + 11 * Math.sin(a)}
+          x2={CX + RING_INNER_R * Math.cos(a)} y2={CY + RING_INNER_R * Math.sin(a)}
+          stroke={colors[i]} strokeWidth={0.6} opacity={0.22}
+        />
+      );
+    })}
+
+    {/* Earth at the center — these are geocentric positions */}
+    <circle cx={CX} cy={CY} r={7} fill="currentColor" fillOpacity={0.08}
+      stroke="currentColor" strokeOpacity={0.35} strokeWidth={0.6} />
+    <text x={CX} y={CY} textAnchor="middle" dominantBaseline="central"
+      fontSize="9" fill="currentColor" opacity={0.55}>
+      &#x2295;&#xFE0E;
+    </text>
+
+    {CHART_BODIES.map((name, i) => {
+      const lon   = lons[name];
+      if (lon === undefined) return null;
+      const r     = orbitRadius(i);
+      const a     = lonToAngle(lon);
+      const gx    = CX + r * Math.cos(a);
+      const gy    = CY + r * Math.sin(a);
+      const color = planetColors[name] ?? 'currentColor';
+      const retro = retrogrades[name];
+      return (
+        <g key={name}>
+          {/* The body's orbit ring; dashed while it is retrograde */}
+          <circle
+            cx={CX} cy={CY} r={r}
+            fill="none" stroke={color} strokeWidth={0.6}
+            strokeOpacity={0.3}
+            strokeDasharray={retro ? '2 3' : undefined}
+          />
+          {/* Leader from the body out to the zodiac band, ending in a degree tick */}
+          <line
+            x1={gx} y1={gy}
+            x2={CX + (RING_INNER_R - 6) * Math.cos(a)} y2={CY + (RING_INNER_R - 6) * Math.sin(a)}
+            stroke={color} strokeWidth={0.4} opacity={0.3}
+          />
+          <line
+            x1={CX + (RING_INNER_R - 6) * Math.cos(a)} y1={CY + (RING_INNER_R - 6) * Math.sin(a)}
+            x2={CX + (RING_INNER_R - 1) * Math.cos(a)} y2={CY + (RING_INNER_R - 1) * Math.sin(a)}
+            stroke={color} strokeWidth={1} opacity={0.75}
+          />
+          {/* The body itself, sitting on its ring */}
+          <text
+            x={gx} y={gy}
+            textAnchor="middle" dominantBaseline="central"
+            fontSize="9.5" fill={color}
+            filter="url(#orbit-shadow)"
+          >
+            {PLANET_SYMBOLS[name]}
+          </text>
+        </g>
+      );
+    })}
+  </>
+);
+
 // ---- Component ----------------------------------------------
 
 export interface AstroClockProps {
   date: Date;
+  /** Which rendering to use; defaults to the classic single-band wheel */
+  view?: AstroView;
   /** Override for the highlighted icon; defaults to the computed Sun-sign when not provided */
   activeIconIndex?: number;
   onSignClick?: (index: number) => void;
 }
 
-export const AstroClock: React.FC<AstroClockProps> = ({ date, activeIconIndex: activeOverride, onSignClick }) => {
+export const AstroClock: React.FC<AstroClockProps> = ({
+  date,
+  view = 'wheel',
+  activeIconIndex: activeOverride,
+  onSignClick,
+}) => {
+  const dark          = useDark();
+  const mode          = dark ? 'dark' : 'light';
+  const colors        = signColors(mode);
+  const planetColors  = PLANET_PALETTE[mode];
   const lons          = calcPlanetLongitudes(date);
   const sunLon        = lons.Sun ?? 0;
-  const sunPos        = sunLon / 360;
   const activeSunSign = Math.floor(sunLon / 30) % 12;
   // Use the parent-provided index (user selection) or fall back to the Sun's sign
   const effectiveActive = activeOverride ?? activeSunSign;
+  const retrogrades   = view === 'rings' ? calcRetrogrades(date) : {};
 
   return (
     <RadialClock
-      colorStops={ZODIAC_COLORS}
-      ticks={36}
-      majorTicks={[]}
+      colorStops={zodiacStops(colors)}
+      ticks={RING_TICKS}
+      majorTicks={SIGN_BOUNDARIES}
       labels={[]}
       sectors={[]}
       icons={[]}
       startAngleOffset={START_ANGLE}
+      direction={CHART_DIRECTION}
       size={SIZE}
       ringRadius={RING_RADIUS}
       ringWidth={RING_WIDTH}
@@ -313,28 +558,37 @@ export const AstroClock: React.FC<AstroClockProps> = ({ date, activeIconIndex: a
       innerCircleRadius={0}
       idPrefix="astro"
     >
-      {/* Major aspect chord web */}
-      <AspectWeb lons={lons} />
-      {/* Staggered planet glyphs with degree tick marks */}
-      <PlanetGlyphs lons={lons} />
-      {/* Sun glyph at hand tip */}
-      {(() => {
-        const a = sunPos * 2 * Math.PI + START_ANGLE;
-        return (
-          <text
-            x={CX + SUN_HAND_R * Math.cos(a)}
-            y={CY + SUN_HAND_R * Math.sin(a)}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontSize="11"
-            fill="#FFD700"
-          >
-            &#x2609;&#xFE0E;
-          </text>
-        );
-      })()}
-      {/* Clickable zodiac sign symbols outside the ring */}
-      <ZodiacSymbols activeIndex={effectiveActive} onSignClick={onSignClick} />
+      {view === 'rings' ? (
+        <OrbitRings lons={lons} retrogrades={retrogrades} colors={colors}
+          planetColors={planetColors} dark={dark} />
+      ) : (
+        <>
+          {/* Major aspect chord web */}
+          <AspectWeb lons={lons} colors={ASPECT_PALETTE[mode]} />
+          {/* Staggered planet glyphs with degree tick marks */}
+          <PlanetGlyphs lons={lons} planetColors={planetColors} dark={dark} />
+          {/* Sun glyph at hand tip */}
+          {(() => {
+            const a = lonToAngle(sunLon);
+            return (
+              <text
+                x={CX + SUN_HAND_R * Math.cos(a)}
+                y={CY + SUN_HAND_R * Math.sin(a)}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize="11"
+                fill={planetColors.Sun}
+              >
+                &#x2609;&#xFE0E;
+              </text>
+            );
+          })()}
+        </>
+      )}
+      {/* Civil months, measured against the same ecliptic */}
+      <MonthCollar year={date.getFullYear()} />
+      {/* Clickable zodiac sign symbols outside the collar */}
+      <ZodiacSymbols activeIndex={effectiveActive} colors={colors} onSignClick={onSignClick} />
     </RadialClock>
   );
 };
@@ -343,7 +597,11 @@ export const AstroClock: React.FC<AstroClockProps> = ({ date, activeIconIndex: a
 const PLANET_ORDER = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune'];
 
 export const PlanetaryPositionsTable: React.FC<{ date: Date }> = ({ date }) => {
-  const lons = calcPlanetLongitudes(date);
+  const mode         = useDark() ? 'dark' : 'light';
+  const colors       = signColors(mode);
+  const planetColors = PLANET_PALETTE[mode];
+  const lons         = calcPlanetLongitudes(date);
+  const retro        = calcRetrogrades(date);
   return (
     <Box component="table" sx={{ borderCollapse: 'collapse', lineHeight: 1.7 }}>
       <Box component="tbody">
@@ -355,17 +613,21 @@ export const PlanetaryPositionsTable: React.FC<{ date: Date }> = ({ date }) => {
           const sign      = ZODIAC_DATA[signIdx];
           return (
             <Box component="tr" key={name}>
-              <Box component="td" sx={{ pr: 0.75, color: PLANET_COLORS[name], textAlign: 'center' }}>
+              <Box component="td" sx={{ pr: 0.75, color: planetColors[name], textAlign: 'center' }}>
                 {PLANET_SYMBOLS[name]}
               </Box>
               <Box component="td" sx={{ pr: 1, color: 'text.secondary', fontSize: '0.72rem' }}>
                 {name}
               </Box>
-              <Box component="td" sx={{ pr: 0.5, color: SIGN_COLORS[signIdx] }}>
+              <Box component="td" sx={{ pr: 0.5, color: colors[signIdx] }}>
                 {sign.symbol}
               </Box>
               <Box component="td" sx={{ fontVariantNumeric: 'tabular-nums', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
                 {degInSign}°{minutes.toString().padStart(2, '0')}′
+              </Box>
+              <Box component="td" sx={{ pl: 0.5, color: planetColors[name], fontSize: '0.72rem', opacity: 0.85 }}
+                title={retro[name] ? `${name} is retrograde` : undefined}>
+                {retro[name] ? RETROGRADE_SYMBOL : ''}
               </Box>
             </Box>
           );
@@ -376,22 +638,15 @@ export const PlanetaryPositionsTable: React.FC<{ date: Date }> = ({ date }) => {
 };
 
 // ---- ElementModalitySummary ---------------------------------
-const ELEMENT_SIGN_SETS: Record<string, number[]> = {
-  Fire:  [0, 4, 8],
-  Earth: [1, 5, 9],
-  Air:   [2, 6, 10],
-  Water: [3, 7, 11],
-};
-const MODALITY_SIGN_SETS: Record<string, number[]> = {
-  Cardinal: [0, 3, 6, 9],
-  Fixed:    [1, 4, 7, 10],
-  Mutable:  [2, 5, 8, 11],
-};
-const ELEMENT_COLOR_MAP: Record<string, string> = {
-  Fire: '#D94040', Earth: '#4A7A30', Air: '#C8A820', Water: '#2050A8',
-};
-
+const SIGN_INDEXES = Array.from({ length: 12 }, (_, i) => i);
+const ELEMENT_SIGN_SETS: Record<string, number[]> = Object.fromEntries(
+  ELEMENTS.map(el => [el, SIGN_INDEXES.filter(i => signElement(i) === el)]),
+);
+const MODALITY_SIGN_SETS: Record<string, number[]> = Object.fromEntries(
+  MODALITIES.map(mo => [mo, SIGN_INDEXES.filter(i => signModality(i) === mo)]),
+);
 export const ElementModalitySummary: React.FC<{ date: Date }> = ({ date }) => {
+  const elemColor = ELEMENT_PALETTE[useDark() ? 'dark' : 'light'];
   const lons      = calcPlanetLongitudes(date);
   const signIdxes = Object.values(lons).map(lon => Math.floor(lon / 30));
   const tally     = (sets: Record<string, number[]>) =>
@@ -403,7 +658,7 @@ export const ElementModalitySummary: React.FC<{ date: Date }> = ({ date }) => {
       <Box sx={{ display: 'flex', gap: 1.5, mb: 0.5 }}>
         {tally(ELEMENT_SIGN_SETS).map(({ name, count }) => (
           <Box key={name} sx={{ textAlign: 'center', minWidth: 34 }}>
-            <Box sx={{ color: ELEMENT_COLOR_MAP[name], fontWeight: 600, fontSize: '0.85rem' }}>{count}</Box>
+            <Box sx={{ color: elemColor[name as Element], fontWeight: 600, fontSize: '0.85rem' }}>{count}</Box>
             <Box sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>{name}</Box>
           </Box>
         ))}
@@ -425,14 +680,17 @@ export default AstroClock;
 // ---- AspectsTable ------------------------------------------
 
 const ASPECT_SYMBOLS: Record<string, string> = {
-  Conjunction: '\u260C\uFE0E',
-  Sextile:     '\u26B9',
-  Square:      '\u25A1',
-  Trine:       '\u25B3',
-  Opposition:  '\u260D\uFE0E',
+  Conjunction: '☌︎',
+  Sextile:     '⚹',
+  Square:      '□',
+  Trine:       '△',
+  Opposition:  '☍︎',
 };
 
 export const AspectsTable: React.FC<{ date: Date }> = ({ date }) => {
+  const mode         = useDark() ? 'dark' : 'light';
+  const planetColors = PLANET_PALETTE[mode];
+  const aspectColors = ASPECT_PALETTE[mode];
   const lons    = calcPlanetLongitudes(date);
   const aspects = calcAspects(lons).sort((a, b) => a.orb - b.orb);
   if (aspects.length === 0) return null;
@@ -440,10 +698,10 @@ export const AspectsTable: React.FC<{ date: Date }> = ({ date }) => {
     <Box component="table" sx={{ borderCollapse: 'collapse', lineHeight: 1.65, mt: 0.5 }}>
       <Box component="tbody">
         {aspects.map((asp, i) => {
-          const color = ASPECT_COLOR[asp.type];
+          const color = aspectColors[asp.type];
           return (
             <Box component="tr" key={i}>
-              <Box component="td" sx={{ pr: 0.5, color: PLANET_COLORS[asp.body1], textAlign: 'center' }}>
+              <Box component="td" sx={{ pr: 0.5, color: planetColors[asp.body1], textAlign: 'center' }}>
                 {PLANET_SYMBOLS[asp.body1]}
               </Box>
               <Box component="td" sx={{ pr: 0.75, color: 'text.secondary', fontSize: '0.72rem' }}>
@@ -452,7 +710,7 @@ export const AspectsTable: React.FC<{ date: Date }> = ({ date }) => {
               <Box component="td" sx={{ px: 0.5, color, textAlign: 'center', fontSize: '1rem', lineHeight: 1 }}>
                 {ASPECT_SYMBOLS[asp.type]}
               </Box>
-              <Box component="td" sx={{ pr: 0.5, pl: 0.5, color: PLANET_COLORS[asp.body2], textAlign: 'center' }}>
+              <Box component="td" sx={{ pr: 0.5, pl: 0.5, color: planetColors[asp.body2], textAlign: 'center' }}>
                 {PLANET_SYMBOLS[asp.body2]}
               </Box>
               <Box component="td" sx={{ pr: 0.75, color: 'text.secondary', fontSize: '0.72rem' }}>
