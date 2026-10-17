@@ -22,6 +22,8 @@ type SavedTarot = {
   c: SavedCard[];
   p?: { n: string; d?: string }[];
   rv?: 1;
+  /** querent's message */
+  q?: string;
 };
 
 type SavedTokens = {
@@ -29,6 +31,7 @@ type SavedTokens = {
   s: string;
   t: SavedCard[];
   p?: string[];
+  q?: string;
 };
 
 type SavedReading = SavedTarot | SavedTokens;
@@ -64,6 +67,7 @@ function serializeReading(reading: AnyReading): SavedReading {
       saved.p = reading.positions.map(p => p.description ? { n: p.name, d: p.description } : { n: p.name });
     }
     if (reading.hasReversals) saved.rv = 1;
+    if (reading.message) saved.q = reading.message;
     return saved;
   }
   const saved: SavedTokens = {
@@ -72,6 +76,7 @@ function serializeReading(reading: AnyReading): SavedReading {
     t: reading.tokens.map(t => serializeCard(t.id, t.isReversed)),
   };
   if (reading.spread.positions?.length) saved.p = reading.spread.positions;
+  if (reading.message) saved.q = reading.message;
   return saved;
 }
 
@@ -90,6 +95,7 @@ function hydrateTarot(saved: SavedTarot, id: number): TarotReadingRecord | null 
   return {
     kind: 'tarot',
     id,
+    message: typeof saved.q === 'string' ? saved.q : undefined,
     cards,
     spread,
     positions,
@@ -117,6 +123,7 @@ function hydrateTokens(saved: SavedTokens, id: number): TokenReadingRecord | nul
   return {
     kind: 'tokens',
     id,
+    message: typeof saved.q === 'string' ? saved.q : undefined,
     label: saved.k === 'o' ? 'Ogham' : 'Runes',
     tokens,
     spread,

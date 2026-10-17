@@ -13,6 +13,7 @@ import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
 import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import CardItem from './CardItem';
+import ReadingInterpretation from './ReadingInterpretation';
 import { DEFAULT_FLIP, LAYOUT_CARD_W, LAYOUT_GAP, REVEALED_FLIP, type CardFlipState, type DrawnCard, type SpreadOption, type SpreadPosition } from './tarot-constants';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
@@ -45,6 +46,8 @@ export interface DrawnToken extends DivinationToken {
 export interface TokenReadingRecord {
   kind: 'tokens';
   id: number;
+  /** The querent's message the draw was seeded from, if any. */
+  message?: string;
   label: string;
   tokens: DrawnToken[];
   spread: DrawSpread;
@@ -54,6 +57,8 @@ export interface TokenReadingRecord {
 export interface TarotReadingRecord {
   kind: 'tarot';
   id: number;
+  /** The querent's message the draw was seeded from, if any. */
+  message?: string;
   cards: DrawnCard[];
   spread: SpreadOption;
   positions: SpreadPosition[] | undefined;
@@ -234,6 +239,12 @@ export function ReadingEntry({
         </IconButton>
       </Box>
 
+      {reading.message && (
+        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', mb: 1, whiteSpace: 'pre-wrap', maxWidth: 640 }}>
+          “{reading.message}”
+        </Typography>
+      )}
+
       <Collapse in={expanded} timeout={300} sx={{ width: '100%' }}>
       {reading.kind === 'tokens' ? (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'center' }}>
@@ -249,6 +260,7 @@ export function ReadingEntry({
       ) : (
         <TarotContent record={reading} viewMode={viewMode} onOpenModal={onOpenModal} />
       )}
+      <ReadingInterpretation reading={reading} />
       </Collapse>
 
       <Menu

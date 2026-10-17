@@ -5,8 +5,10 @@ import { enrichedCards } from './tarot-data';
 import { SPREADS, type DrawnCard, type SpreadOption, type SpreadPosition } from './tarot-constants';
 import SpreadControls from './SpreadControls';
 import { type TarotReadingRecord } from './ReadingEntry';
+import { createDrawRng, drawFrom } from './seeded-rng';
 
-export default function TarotControls({ systemSelector, extraActions, onDraw }: {
+export default function TarotControls({ message, systemSelector, extraActions, onDraw }: {
+  message: string;
   systemSelector?: React.ReactNode;
   extraActions?: React.ReactNode;
   onDraw: (data: Omit<TarotReadingRecord, 'id' | 'kind'>) => void;
@@ -18,14 +20,9 @@ export default function TarotControls({ systemSelector, extraActions, onDraw }: 
 
   const draw = () => {
     const count = selectedSpread.count ?? customCount;
-    const availableCards = [...enrichedCards];
-    const newCards: DrawnCard[] = [];
-    for (let i = 0; i < count; i++) {
-      if (!availableCards.length) break;
-      const idx = Math.floor(Math.random() * availableCards.length);
-      const card = availableCards.splice(idx, 1)[0];
-      newCards.push({ ...card, isReversed: allowReversals && Math.random() < 0.5 });
-    }
+    const rng = createDrawRng(message, `Tarot|${selectedSpread.name}|${count}`);
+    const newCards: DrawnCard[] = drawFrom(enrichedCards, count, rng, allowReversals)
+      .map(({ item, isReversed }) => ({ ...item, isReversed }));
     const customPositionLines = customPositionText.split('\n').filter(l => l.trim().length > 0);
     const displayPositions: SpreadPosition[] | undefined = selectedSpread.count === null
       ? customPositionLines.map(l => { const [name, ...rest] = l.trim().split(' - '); return { name: name.trim(), description: rest.join(' - ').trim() }; })

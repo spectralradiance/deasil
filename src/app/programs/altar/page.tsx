@@ -1,10 +1,10 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Box, Button, FormControl, InputLabel, MenuItem, Select, Tab, Tabs, Typography } from '@mui/material';
+import { Box, Button, FormControl, InputLabel, MenuItem, Select, Tab, Tabs, TextField, Typography } from '@mui/material';
 import TarotControls from './TarotReading';
 import DivinationControls from './DivinationReading';
 import OracleBrowser from './OracleBrowser';
-import { ReadingEntry, type AnyReading, type DivinationToken, type DrawSpread, type TokenState } from './ReadingEntry';
+import { ReadingEntry, type AnyReading, type DivinationToken, type DrawSpread, type TarotReadingRecord, type TokenReadingRecord, type TokenState } from './ReadingEntry';
 import CardModal from './CardModal';
 import { RUNES, RUNE_AETTS } from './rune-data';
 import { OGHAM, OGHAM_AICMI } from './ogham-data';
@@ -64,6 +64,7 @@ export default function AltarPage() {
   const [saved, setSaved] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
   const [browseTab, setBrowseTab] = useState(0);
+  const [message, setMessage] = useState('');
   const nextId = useRef(0);
 
   useEffect(() => {
@@ -72,6 +73,12 @@ export default function AltarPage() {
     setReadings(restored);
     nextId.current = restored.length;
   }, []);
+
+  /** Prepends a fresh reading, stamped with the message it was seeded from. */
+  const addReading = (reading: Omit<TarotReadingRecord, 'id' | 'message'> | Omit<TokenReadingRecord, 'id' | 'message'>) => {
+    const record = { ...reading, id: nextId.current++, message: message.trim() || undefined } as AnyReading;
+    setReadings(prev => [record, ...prev]);
+  };
 
   const handleSave = () => {
     writeReadingsToUrl(readings);
@@ -129,25 +136,40 @@ export default function AltarPage() {
         </Box>
 
         <Box sx={{ display: browseOpen ? 'none' : 'block', width: '100%', mb: 2 }}>
+          <TextField
+            label="Message"
+            placeholder="A question, an intention, or nothing at all"
+            helperText={message.trim() ? 'The draw is seeded from your words, the spread and today’s date' : 'Leave blank for a purely random draw'}
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            multiline
+            minRows={1}
+            maxRows={4}
+            slotProps={{ htmlInput: { maxLength: 500 } }}
+            sx={{ width: 600, maxWidth: '100%', mx: 'auto', mb: 2, display: 'flex' }}
+          />
           {system === 0 && (
             <TarotControls
+              message={message}
               systemSelector={systemSelect}
               extraActions={extraActions}
-              onDraw={data => setReadings(prev => [{ kind: 'tarot', id: nextId.current++, ...data }, ...prev])}
+              onDraw={data => addReading({ kind: 'tarot', ...data })}
             />
           )}
           {system === 1 && (
             <DivinationControls
+              label="Runes" message={message}
               tokens={RUNE_TOKENS} spreads={RUNE_SPREADS} canReverse
               systemSelector={systemSelect} extraActions={extraActions}
-              onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Runes', tokens, spread, states: new Map() }, ...prev])}
+              onDraw={(tokens, spread) => addReading({ kind: 'tokens', label: 'Runes', tokens, spread, states: new Map() })}
             />
           )}
           {system === 2 && (
             <DivinationControls
+              label="Ogham" message={message}
               tokens={OGHAM_TOKENS} spreads={OGHAM_SPREADS} canReverse
               systemSelector={systemSelect} extraActions={extraActions}
-              onDraw={(tokens, spread) => setReadings(prev => [{ kind: 'tokens', id: nextId.current++, label: 'Ogham', tokens, spread, states: new Map() }, ...prev])}
+              onDraw={(tokens, spread) => addReading({ kind: 'tokens', label: 'Ogham', tokens, spread, states: new Map() })}
             />
           )}
         </Box>
