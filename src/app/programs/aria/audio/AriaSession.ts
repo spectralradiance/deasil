@@ -4,7 +4,8 @@ import { GraphInstrument } from './GraphInstrument';
 import { presetGraph } from './graph-presets';
 import { Scale, type ScaleName } from '../lib/scale';
 import {
-  findPattern, isAudible, laneInstrumentId, laneKey, laneScaleName, positionAt,
+  findPattern, isAudible, laneChordOffsets, laneGate, laneInstrumentId, laneKey,
+  laneScaleName, positionAt,
   type Lane, type Song, type Track,
 } from '../lib/song';
 import { mod } from '../lib/math';
@@ -255,12 +256,19 @@ export class AriaSession {
       // scale from the rest without touching the song's.
       const scale = this.scaleFor(laneKey(song, lane), laneScaleName(song, lane));
 
-      instrument.noteOn({
-        time: event.time,
-        index: scale.indexAt(step.degree),
-        holdSeconds: event.duration * track.gate,
-        velocity: step.velocity ?? 0.9,
-      });
+      // A chord is voiced here rather than stored: one written degree becomes
+      // several notes, read through this lane's own scale. `[0]` for a plain
+      // lane, so there is only one path.
+      const holdSeconds = event.duration * laneGate(track, lane);
+      const velocity = step.velocity ?? 0.9;
+      for (const offset of laneChordOffsets(song, lane)) {
+        instrument.noteOn({
+          time: event.time,
+          index: scale.indexAt(step.degree + offset),
+          holdSeconds,
+          velocity,
+        });
+      }
     }
   };
 }

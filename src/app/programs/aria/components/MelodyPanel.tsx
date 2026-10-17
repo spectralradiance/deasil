@@ -1,4 +1,5 @@
-// Per-track generation. Every control here is playable: while `live` is on,
+// The melody panel: per-lane generation. Every control here is playable:
+// while `live` is on,
 // moving one re-derives the track against the running loop.
 
 'use client';
@@ -19,10 +20,15 @@ import GridOnIcon from '@mui/icons-material/GridOn';
 import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
 import BlurOnIcon from '@mui/icons-material/BlurOn';
+import TimelapseIcon from '@mui/icons-material/Timelapse';
+import LayersIcon from '@mui/icons-material/Layers';
 import { Field, Row, SelectField, SliderField, ToggleField } from './ControlRow';
+import { seedAffectsPhrase } from '../lib/generate';
 import PianoRoll from './PianoRoll';
 import { SCALE_NAMES, type Scale, type ScaleName } from '../lib/scale';
+import { MAX_GATE, MIN_GATE } from '../lib/song';
 import type { Lane, StepSlot, TrackGenerator } from '../lib/song';
+import { CHORD_HELP, CHORD_NAMES, chordOffsets, type ChordName } from '../lib/chord';
 import type { PitchKind, RhythmKind } from '../lib/generate';
 import { euclideanRhythm } from '../lib/generate';
 
@@ -36,8 +42,14 @@ interface Props {
   /** The lane's notes, for the piano roll. */
   steps: StepSlot[];
   scale: Scale;
-  /** The track's gate, so note lengths in the roll match what plays. */
+  /** The note length actually in force: the lane's override, or the track's. */
   gate: number;
+  /** The track's own gate, offered as the value the lane falls back to. */
+  trackGate: number;
+  /** Voices the track has, so a chord that will not fit can say so. */
+  polyphony: number;
+  /** Degrees per octave of the lane's mode, which sizes the chord voicings. */
+  scaleSize: number;
   /** The lane's own overrides, each null when it inherits. */
   lane: Lane;
   /** What it inherits when it does. */
@@ -90,13 +102,22 @@ function RhythmPreview({ generator, stepCount, stepsPerBeat }: {
   );
 }
 
-export default function TrackGeneratorPanel({
-  generator, stepCount, stepsPerBeat, steps, scale, gate,
+export default function MelodyPanel({
+  generator, stepCount, stepsPerBeat, steps, scale, gate, trackGate, polyphony, scaleSize,
   lane, songKey, songScaleName, trackInstrumentId, instrumentIds, onLaneChange,
   playing, onPlay, onStop, onSetStep, readRow, patternPlaying,
   onChange, onReseed, onKeep, onGenerateOnce,
 }: Props) {
   const { live } = generator;
+  // A drone on a euclidean rhythm consumes no randomness at all, so a new seed
+  // would leave every note where it was. Say so rather than offering a button
+  // that does nothing.
+  const canReseed = seedAffectsPhrase(generator);
+  const chord = lane.chord ?? 'none';
+  const voicing = chordOffsets(chord, scaleSize);
+  // A triad on a monophonic track steals its own notes. Say so rather than
+  // letting it sound broken for no visible reason.
+  const crowded = voicing.length > polyphony;
 
   return (
     <Stack spacing={2.5}>
@@ -111,13 +132,27 @@ export default function TrackGeneratorPanel({
         <Field
           label="actions"
           icon={<CasinoIcon />}
-          help="Reseed rolls new pitches, leaving the rhythm alone. Keep freezes the current notes as ordinary editable steps."
+          help="Reseed rolls a new phrase and writes it, whether or not the lane is live. Keep freezes the current notes as ordinary editable steps."
         >
           <Stack direction="row" spacing={1} alignItems="center">
-            <Tooltip title="Roll a new seed: new pitches, same rhythm">
-              <Button size="small" variant="outlined" startIcon={<CasinoIcon />} onClick={onReseed}>
-                reseed
-              </Button>
+            {/* The span is what carries the tooltip when the button is
+                disabled — a disabled button fires no pointer events. */}
+            <Tooltip
+              title={canReseed
+                ? 'Roll a new phrase and write it into the lane'
+                : 'A drone on a fixed rhythm uses no randomness, so a new seed would change nothing. Switch the pitch to walk or arpeggio, or the rhythm to random.'}
+            >
+              <span>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<CasinoIcon />}
+                  onClick={onReseed}
+                  disabled={!canReseed}
+                >
+                  reseed
+                </Button>
+              </span>
             </Tooltip>
             {live ? (
               <Tooltip title="Stop generating and keep these notes as ordinary editable steps">
@@ -132,9 +167,14 @@ export default function TrackGeneratorPanel({
                 </Button>
               </Tooltip>
             )}
-            {live && (
-              <Tooltip title="The number the pitches derive from. The same seed and settings always give the same phrase.">
-                <Chip size="small" color="primary" variant="outlined" label={`seed ${generator.seed}`} />
+            {canReseed && (
+              <Tooltip title="The number the phrase derives from. The same seed and settings always give the same phrase.">
+                <Chip
+                  size="small"
+                  color={live ? 'primary' : 'default'}
+                  variant="outlined"
+                  label={`seed ${generator.seed}`}
+                />
               </Tooltip>
             )}
           </Stack>
@@ -327,6 +367,60 @@ export default function TrackGeneratorPanel({
         )}
       </Row>
 
+      <Row>
+        <SliderField
+          label="note length"
+          icon={<TimelapseIcon />}
+          help="How long each note is held, as a multiple of one step. Above 1 notes overrun into the next step and overlap, which is what uses up the track's polyphony. Setting it here overrides the track's gate for this lane alone."
+          value={gate}
+          min={MIN_GATE}
+          max={MAX_GATE}
+          step={0.05}
+          format={(v) => `${v.toFixed(2)}\u00d7`}
+          onChange={(v) => onLaneChange({ gate: v })}
+        />
+        <Field
+          label="length from"
+          icon={<TimelapseIcon />}
+          help="Whether this lane sets its own note length or follows the track's gate. Press to hand it back to the track."
+          value={lane.gate === null ? 'track' : 'lane'}
+        >
+          <Tooltip title={lane.gate === null
+            ? 'Already following the track'
+            : `Drop this lane's own note length and follow the track's ${trackGate.toFixed(2)}\u00d7 again`}
+          >
+            <span>
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={lane.gate === null}
+                onClick={() => onLaneChange({ gate: null })}
+              >
+                {`track ${trackGate.toFixed(2)}\u00d7`}
+              </Button>
+            </span>
+          </Tooltip>
+        </Field>
+        <SelectField
+          label="chord"
+          icon={<LayersIcon />}
+          help={`How many notes each written degree sounds as. ${CHORD_HELP[chord]} The voicing is read through this lane's scale at play time, so changing the key or the mode re-voices every chord without rewriting a note.`}
+          value={chord}
+          options={CHORD_NAMES}
+          onChange={(value: ChordName) => onLaneChange({ chord: value })}
+        />
+        {crowded && (
+          <Tooltip title="Every note of the chord needs its own voice. Raise the track's polyphony in the track panel, or the chord will cut off its own notes.">
+            <Chip
+              size="small"
+              color="warning"
+              variant="outlined"
+              label={`needs ${voicing.length} voices, track has ${polyphony}`}
+            />
+          </Tooltip>
+        )}
+      </Row>
+
       <RhythmPreview generator={generator} stepCount={stepCount} stepsPerBeat={stepsPerBeat} />
 
       <Box>
@@ -338,6 +432,7 @@ export default function TrackGeneratorPanel({
           scale={scale}
           stepsPerBeat={stepsPerBeat}
           gate={gate}
+          chordOffsets={voicing}
           onSetStep={onSetStep}
           readRow={readRow}
           playing={patternPlaying}

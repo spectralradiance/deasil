@@ -22,6 +22,12 @@ interface Props {
   stepsPerBeat: number;
   /** Note length as a multiple of the step, so overlaps are visible. */
   gate: number;
+  /**
+   * Degree offsets each written note sounds as. `[0]` is a plain lane; a chord
+   * voicing adds tones above, drawn dimmer because they are derived rather
+   * than written — clicking still edits the one note underneath.
+   */
+  chordOffsets?: readonly number[];
   height?: number;
   /** Writes one step. Pass null to clear it. */
   onSetStep?: (index: number, slot: StepSlot) => void;
@@ -47,7 +53,8 @@ interface Drag {
 }
 
 export default function PianoRoll({
-  steps, scale, stepsPerBeat, gate, height = 190, onSetStep, readRow, playing = false,
+  steps, scale, stepsPerBeat, gate, chordOffsets = [0], height = 190,
+  onSetStep, readRow, playing = false,
 }: Props) {
   const theme = useTheme();
   const areaRef = useRef<HTMLDivElement | null>(null);
@@ -57,9 +64,11 @@ export default function PianoRoll({
   const editable = Boolean(onSetStep);
 
   const model = useMemo(() => {
-    const indices = steps
-      .map((slot) => (slot ? scale.indexAt(slot.degree) : null))
-      .filter((n): n is number => n !== null);
+    // Every sounding tone counts towards the range, not just the written one,
+    // or the top of a chord would be drawn off the edge of the roll.
+    const indices = steps.flatMap((slot) => (slot
+      ? chordOffsets.map((offset) => scale.indexAt(slot.degree + offset))
+      : []));
 
     // An empty lane still needs a canvas to draw a note onto, so fall back to
     // an octave either side of the key rather than rendering nothing.
@@ -70,7 +79,7 @@ export default function PianoRoll({
     const from = Math.floor((centre - span / 2) / OCTAVE) * OCTAVE;
     const to = Math.ceil((centre + span / 2) / OCTAVE) * OCTAVE;
     return { from, rows: to - from };
-  }, [steps, scale]);
+  }, [steps, scale, chordOffsets]);
 
   const { from, rows } = model;
   const rowHeight = Math.max(4, Math.min(11, height / rows));
@@ -90,7 +99,9 @@ export default function PianoRoll({
       if (row !== painted) {
         if (bar) {
           bar.style.opacity = row >= 0 ? '1' : '0';
-          if (row >= 0) bar.style.transform = `translateX(${row * stepPercent}%)`;
+          // A translate percentage is of the bar's own width, and the bar is
+          // exactly one step wide — so one step is 100%, not stepPercent.
+          if (row >= 0) bar.style.transform = `translateX(${row * 100}%)`;
         }
         painted = row;
       }
@@ -101,7 +112,7 @@ export default function PianoRoll({
       cancelAnimationFrame(frame);
       if (bar) bar.style.opacity = '0';
     };
-  }, [playing, readRow, stepPercent]);
+  }, [playing, readRow]);
 
   /** Pointer position to a step column and a scale degree. */
   const locate = useCallback((clientX: number, clientY: number) => {
@@ -201,27 +212,33 @@ export default function PianoRoll({
     .filter((n) => !(drag && drag.moved && !drag.creating && n.step === drag.fromStep));
 
   const noteAt = (step: number, degree: number, ghost: boolean) => {
-    const index = scale.indexAt(degree);
-    const row = from + rows - 1 - index;
-    if (row < 0 || row >= rows) return null;
-    return (
+    const voicing = chordOffsets.map((offset) => {
+      const index = scale.indexAt(degree + offset);
+      return { offset, index, row: from + rows - 1 - index };
+    }).filter((tone) => tone.row >= 0 && tone.row < rows);
+    if (voicing.length === 0) return null;
+
+    const names = voicing.map((tone) => new Note(tone.index).shortName).join(' ');
+    return voicing.map((tone) => (
       <Box
-        key={ghost ? 'drag' : `note-${step}`}
-        title={`step ${step} · degree ${degree} · ${new Note(index).shortName}`}
+        key={ghost ? `drag-${tone.offset}` : `note-${step}-${tone.offset}`}
+        title={`step ${step} · degree ${degree} · ${names}`}
         sx={{
           position: 'absolute',
-          top: row * rowHeight + 0.5,
+          top: tone.row * rowHeight + 0.5,
           height: Math.max(3, rowHeight - 1.5),
           left: `${step * stepPercent}%`,
           width: `${Math.max(stepPercent * gate, stepPercent * 0.6)}%`,
           backgroundColor: 'primary.main',
           borderRadius: 0.5,
-          opacity: ghost ? 1 : 0.9,
-          boxShadow: ghost ? 3 : 'none',
+          // The written note is solid; the tones the chord derives are faded,
+          // so it stays obvious which one an edit would move.
+          opacity: tone.offset === 0 ? (ghost ? 1 : 0.9) : 0.45,
+          boxShadow: ghost && tone.offset === 0 ? 3 : 'none',
           pointerEvents: 'none',
         }}
       />
-    );
+    ));
   };
 
   return (
@@ -311,7 +328,7 @@ export default function PianoRoll({
       <Typography variant="caption" sx={{ opacity: 0.55, display: 'block', mt: 0.75 }}>
         {editable
           ? 'Click empty space to add a note, click a note to remove it, drag to move one. Notes snap to the lane’s scale, and a lane holds one note per step, so a move overwrites what it lands on.'
-          : 'Note length follows the track’s gate, so notes that overrun their step — and so need the polyphony to hold them — overlap here.'}
+          : 'Note length follows the lane’s gate, so notes that overrun their step — and so need the polyphony to hold them — overlap here.'}
       </Typography>
     </Box>
   );

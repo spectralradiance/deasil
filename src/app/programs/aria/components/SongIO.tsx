@@ -2,12 +2,15 @@
 
 'use client';
 import React, { useRef, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
+import {
+  Alert, Box, Button, CircularProgress, MenuItem, Stack, TextField, Typography,
+} from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import { parseSong, serializeSong } from '../lib/serialize';
 import { bounceToWav } from '../lib/bounce';
+import { SONG_PRESETS, findSongPreset } from '../lib/presets';
 import { orderLength, type Song } from '../lib/song';
 
 interface Props {
@@ -60,6 +63,13 @@ export default function SongIO({ song, onLoad }: Props) {
     }
   };
 
+  const loadPreset = (name: string) => {
+    const preset = findSongPreset(name);
+    if (!preset) return;
+    onLoad(preset.build());
+    setMessage({ kind: 'ok', text: `Loaded “${preset.name}” — ${preset.description}` });
+  };
+
   const seconds = (orderLength(song) * 2 * 60) / song.bpm / song.stepsPerBeat;
 
   return (
@@ -97,6 +107,27 @@ export default function SongIO({ song, onLoad }: Props) {
         >
           {busy ? 'rendering…' : 'render wav'}
         </Button>
+
+        {/* Loading one replaces the song outright and the autosave follows it
+            down, exactly as importing a file does. Picking from a dropdown is
+            the deliberate act; export first if the current song matters. */}
+        <TextField
+          select
+          size="small"
+          value=""
+          onChange={(e) => loadPreset(e.target.value)}
+          sx={{ minWidth: 170 }}
+          slotProps={{ select: { displayEmpty: true, renderValue: () => 'load a song…' } }}
+        >
+          {SONG_PRESETS.map((preset) => (
+            <MenuItem key={preset.name} value={preset.name} sx={{ display: 'block', py: 0.75 }}>
+              <Typography variant="body2">{preset.name}</Typography>
+              <Typography variant="caption" sx={{ opacity: 0.6 }}>
+                {preset.description}
+              </Typography>
+            </MenuItem>
+          ))}
+        </TextField>
       </Stack>
 
       {message && (

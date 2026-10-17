@@ -44,10 +44,12 @@ interface Props {
   selectedNodeId: string | null;
   onSelectNode: (id: string | null) => void;
   height?: number;
+  /** Off by default: most patches fit on screen, and it covers a corner. */
+  showMinimap?: boolean;
 }
 
 export default function GraphEditor({
-  graph, onChange, selectedNodeId, onSelectNode, height = 420,
+  graph, onChange, selectedNodeId, onSelectNode, height = 420, showMinimap = false,
 }: Props) {
   const theme = useTheme();
   const split = useMemo(() => splitGraph(graph, isEnvelopeNode), [graph]);
@@ -192,18 +194,20 @@ export default function GraphEditor({
         <Controls showInteractive={false} />
         {/* React Flow's minimap defaults to a light palette, which glares in a
             dark theme; give it the page's own colours. */}
-        <MiniMap
-          pannable
-          zoomable
-          nodeStrokeWidth={2}
-          bgColor={theme.palette.background.default}
-          maskColor={
-            theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)'
-          }
-          nodeColor={theme.palette.text.disabled}
-          nodeStrokeColor={theme.palette.divider}
-          style={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 6 }}
-        />
+        {showMinimap && (
+          <MiniMap
+            pannable
+            zoomable
+            nodeStrokeWidth={2}
+            bgColor={theme.palette.background.default}
+            maskColor={
+              theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)'
+            }
+            nodeColor={theme.palette.text.disabled}
+            nodeStrokeColor={theme.palette.divider}
+            style={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 6 }}
+          />
+        )}
       </ReactFlow>
     </Box>
   );
