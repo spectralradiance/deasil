@@ -78,6 +78,12 @@ export interface RadialClockProps {
    */
   startAngleOffset?: number;
 
+  /** Which way increasing positions travel around the face.
+   *  1 (default) sweeps clockwise; -1 sweeps counter-clockwise, the direction
+   *  an astrological chart runs.
+   */
+  direction?: 1 | -1;
+
   /** SVG viewBox size (square); default 200 */
   size?: number;
 
@@ -115,9 +121,9 @@ export interface RadialClockProps {
 
 // ---- Helpers ------------------------------------------------
 
-/** Convert a 0–1 position to radians, with an optional offset */
-function posToRad(pos: number, offset: number): number {
-  return pos * 2 * Math.PI + offset;
+/** Convert a 0–1 position to radians, with an optional offset and travel direction */
+function posToRad(pos: number, offset: number, direction: 1 | -1 = 1): number {
+  return direction * pos * 2 * Math.PI + offset;
 }
 
 /** Interpolate a color at position `pos` across an array of ColorStops */
@@ -159,9 +165,12 @@ function arcPath(cx: number, cy: number, r: number, a0: number, a1: number, swee
   const y0 = cy + r * Math.sin(a0);
   const x1 = cx + r * Math.cos(a1);
   const y1 = cy + r * Math.sin(a1);
-  // Compute the clockwise angular span so the large-arc flag is correct even when
-  // a1 < a0 (i.e. when the last gradient segment wraps from ~0.75 back to 0.0).
-  const span = ((a1 - a0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+  // Measure the span in the direction the arc actually travels, so the large-arc
+  // flag stays correct both when a segment wraps past 0 (the last gradient
+  // segment running from ~0.75 back to 0.0) and when the face sweeps
+  // counter-clockwise, where a1 < a0 throughout.
+  const clockwise = ((a1 - a0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+  const span = sweep === 1 ? clockwise : 2 * Math.PI - clockwise;
   const large = span > Math.PI ? 1 : 0;
   return `M ${x0} ${y0} A ${r} ${r} 0 ${large} ${sweep} ${x1} ${y1}`;
 }
@@ -177,6 +186,7 @@ export const RadialClock: React.FC<RadialClockProps> = ({
   sectors = [],
   icons = [],
   startAngleOffset = -Math.PI / 2,
+  direction = 1,
   size = 200,
   ringRadius = 70,
   ringWidth = 8,
@@ -187,6 +197,10 @@ export const RadialClock: React.FC<RadialClockProps> = ({
   activeIconIndex,
   onIconClick,
 }) => {
+  // SVG sweep flags for arcs drawn along, and against, the face's travel direction
+  const sweepAlong   = direction === 1 ? 1 : 0;
+  const sweepAgainst = direction === 1 ? 0 : 1;
+
   const cx = size / 2;
   const cy = size / 2;
   const R = ringRadius;
@@ -204,7 +218,7 @@ export const RadialClock: React.FC<RadialClockProps> = ({
 
   // Hand color = gradient color at handPos (fallback unused when hand is hidden)
   const handColor = handPos !== undefined ? interpolateColor(handPos, colorStops) : '#ffffff';
-  const handRad   = handPos !== undefined ? posToRad(handPos, startAngleOffset) : 0;
+  const handRad   = handPos !== undefined ? posToRad(handPos, startAngleOffset, direction) : 0;
 
   return (
     <svg
@@ -217,8 +231,8 @@ export const RadialClock: React.FC<RadialClockProps> = ({
         {/* One linear gradient per color-stop segment */}
         {colorStops.map((stop, i) => {
           const next = colorStops[(i + 1) % colorStops.length];
-          const a0 = posToRad(stop.pos, startAngleOffset);
-          const a1 = posToRad(next.pos, startAngleOffset);
+          const a0 = posToRad(stop.pos, startAngleOffset, direction);
+          const a1 = posToRad(next.pos, startAngleOffset, direction);
           const midR = R;
           return (
             <linearGradient
@@ -249,14 +263,14 @@ export const RadialClock: React.FC<RadialClockProps> = ({
 
         {/* Arc paths for sector labels */}
         {sectors.map(sec => {
-          const a0 = posToRad(sec.startPos, startAngleOffset);
-          const a1 = posToRad(sec.endPos, startAngleOffset);
+          const a0 = posToRad(sec.startPos, startAngleOffset, direction);
+          const a1 = posToRad(sec.endPos, startAngleOffset, direction);
           const textR = sectorTextR;
           return (
             <path
               key={`${idPrefix}-sector-path-${sec.label}`}
               id={`${idPrefix}-sector-path-${sec.label}`}
-              d={arcPath(cx, cy, textR, a0, a1)}
+              d={arcPath(cx, cy, textR, a0, a1, sweepAlong)}
               fill="none"
             />
           );
@@ -278,14 +292,14 @@ export const RadialClock: React.FC<RadialClockProps> = ({
       {/* ── Sector fills ── */}
       {sectors.map(sec => {
         if (!sec.color) return null;
-        const a0 = posToRad(sec.startPos, startAngleOffset);
-        const a1 = posToRad(sec.endPos, startAngleOffset);
+        const a0 = posToRad(sec.startPos, startAngleOffset, direction);
+        const a1 = posToRad(sec.endPos, startAngleOffset, direction);
         const large = ((sec.endPos - sec.startPos + 1) % 1) > 0.5 ? 1 : 0;
         const d = [
           `M ${cx + innerR * Math.cos(a0)} ${cy + innerR * Math.sin(a0)}`,
-          `A ${innerR} ${innerR} 0 ${large} 1 ${cx + innerR * Math.cos(a1)} ${cy + innerR * Math.sin(a1)}`,
+          `A ${innerR} ${innerR} 0 ${large} ${sweepAlong} ${cx + innerR * Math.cos(a1)} ${cy + innerR * Math.sin(a1)}`,
           `L ${cx + outerR * Math.cos(a1)} ${cy + outerR * Math.sin(a1)}`,
-          `A ${outerR} ${outerR} 0 ${large} 0 ${cx + outerR * Math.cos(a0)} ${cy + outerR * Math.sin(a0)}`,
+          `A ${outerR} ${outerR} 0 ${large} ${sweepAgainst} ${cx + outerR * Math.cos(a0)} ${cy + outerR * Math.sin(a0)}`,
           'Z',
         ].join(' ');
         return <path key={`${idPrefix}-sector-fill-${sec.label}`} d={d} fill={sec.color} opacity={0.35} />;
@@ -294,12 +308,12 @@ export const RadialClock: React.FC<RadialClockProps> = ({
       {/* ── Gradient ring arcs ── */}
       {colorStops.map((stop, i) => {
         const next = colorStops[(i + 1) % colorStops.length];
-        const a0 = posToRad(stop.pos, startAngleOffset);
-        const a1 = posToRad(next.pos, startAngleOffset);
+        const a0 = posToRad(stop.pos, startAngleOffset, direction);
+        const a1 = posToRad(next.pos, startAngleOffset, direction);
         return (
           <path
             key={`${idPrefix}-arc-${i}`}
-            d={arcPath(cx, cy, R, a0, a1)}
+            d={arcPath(cx, cy, R, a0, a1, sweepAlong)}
             fill="none"
             stroke={`url(#${idPrefix}-grad-${i})`}
             strokeWidth={ringWidth}
@@ -314,7 +328,7 @@ export const RadialClock: React.FC<RadialClockProps> = ({
         const isMajor = majorTicks.includes(i);
         const tickInner = isMajor ? R - ringWidth / 2 - 8 : R - ringWidth / 2 - 4;
         const tickOuter = R + ringWidth / 2 + (isMajor ? 4 : 0);
-        const a = posToRad(pos, startAngleOffset);
+        const a = posToRad(pos, startAngleOffset, direction);
         const color = interpolateColor(pos, colorStops);
         return (
           <line
@@ -329,7 +343,7 @@ export const RadialClock: React.FC<RadialClockProps> = ({
 
       {/* ── Labels inside the ring ── */}
       {labels.map(lbl => {
-        const a = posToRad(lbl.pos, startAngleOffset);
+        const a = posToRad(lbl.pos, startAngleOffset, direction);
         const labelR = R - ringWidth / 2 - 14;
         return (
           <text
@@ -382,7 +396,7 @@ export const RadialClock: React.FC<RadialClockProps> = ({
       {icons.map((ic, i) => {
         const iconSize = ic.size ?? 22;
         const iconR = R + ringWidth / 2 + iconOffset;
-        const a = posToRad(ic.pos, startAngleOffset);
+        const a = posToRad(ic.pos, startAngleOffset, direction);
         const ix = cx + iconR * Math.cos(a);
         const iy = cy + iconR * Math.sin(a);
         const filterId = ic.color ? `${idPrefix}-icon-filter-${icons.filter(x => x.color).findIndex(x => x === ic)}` : undefined;

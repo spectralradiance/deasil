@@ -5,9 +5,9 @@
 import { useState, useMemo } from 'react';
 import { Box, IconButton, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { YearClock, SABBAT_DATA, dayOfYearToFraction } from './YearClock';
+import { YearClock, SABBAT_DATA } from './YearClock';
 import PhaseInfoPanel, { PhaseRowData } from './PhaseInfoPanel';
-import { getSabbatOccurrence, getNearestSabbats } from '../lib/astro';
+import { getSabbatOccurrence, getNearestSabbats, sabbatWheelPosition } from '../lib/astro';
 import { clockBoxSx, infoPanelSx, infoPanelContentSx } from '../lib/sundial-layout';
 
 interface Props {
@@ -23,7 +23,7 @@ export default function YearClockSection({ time, use24h }: Props) {
 
   const [y, mo, d] = [time.getFullYear(), time.getMonth(), time.getDate()];
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const currentIdx = useMemo(() => Math.floor(dayOfYearToFraction(time) * 8) % 8, [y, mo, d]);
+  const currentIdx = useMemo(() => Math.floor(sabbatWheelPosition(time) * 8) % 8, [y, mo, d]);
   const { current } = getNearestSabbats(time);
 
   const phases: PhaseRowData[] = useMemo(() => {
@@ -43,7 +43,7 @@ export default function YearClockSection({ time, use24h }: Props) {
 
   const season = SEASON_BY_SABBAT_IDX[currentIdx];
   const daysIntoSeason = Math.floor((time.getTime() - phases[currentIdx].last.getTime()) / 86400000);
-  const yearPercent = dayOfYearToFraction(time) * 100;
+  const yearPercent = sabbatWheelPosition(time) * 100;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, width: { xs: '100%', md: 'fit-content' } }}>

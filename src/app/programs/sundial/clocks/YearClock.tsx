@@ -12,6 +12,7 @@
 import React from 'react';
 import { useTheme } from '@mui/material';
 import RadialClock, { ColorStop, RingIcon, RingLabel, RingSector } from './RadialClock';
+import { sabbatWheelPosition } from '../lib/astro';
 
 // ---- Sabbat data --------------------------------------------
 
@@ -85,19 +86,6 @@ const YEAR_LABELS: RingLabel[] = SABBATS.map((sab, i) => ({
 const YEAR_TICKS = 40;
 const YEAR_MAJOR_TICKS = [0, 5, 10, 15, 20, 25, 30, 35];
 
-// ---- Hand position ------------------------------------------
-// Converts today's date to a 0–1 fraction of the pagan year.
-// The pagan year starts at Samhain (≈ Nov 1), which sits at pos=0.
-// Jan 1 is approximately 61 days after Samhain (Nov 1).
-const SAMHAIN_OFFSET_DAYS = 61;
-
-export function dayOfYearToFraction(date: Date): number {
-  const start = new Date(date.getFullYear(), 0, 0);
-  const diff  = date.getTime() - start.getTime();
-  const dayOfYear = Math.floor(diff / 86400000); // 1–365
-  return ((dayOfYear + SAMHAIN_OFFSET_DAYS) / 365) % 1;
-}
-
 // ---- Component ----------------------------------------------
 
 interface YearClockProps {
@@ -110,7 +98,7 @@ interface YearClockProps {
 
 export const YearClock: React.FC<YearClockProps> = ({ date, onIconClick, activeIconIndex: activeOverride }) => {
   const theme    = useTheme();
-  const handPos  = dayOfYearToFraction(date);
+  const handPos  = sabbatWheelPosition(date);
 
   // Index of the most-recently-passed sabbat, used to highlight the matching icon
   const activeSabbatIndex = Math.floor(handPos * 8) % 8;
